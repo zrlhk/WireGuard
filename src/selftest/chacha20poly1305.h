@@ -334,24 +334,101 @@ bool __init chacha20poly1305_selftest(void)
 	pr_info("Start chacha20 benchmark: ");
 
 	struct chacha20_ctx chacha20_state = chacha20_initial_state(chacha20poly1305_enc_vectors[0].key, (u8 *)&chacha20poly1305_enc_vectors->nonce);
-	u8 block0[CHACHA20_BLOCK_SIZE] = { 0 };
+	
+	u8 block0[1440] = { 0 };
 	cycles_t start, end;
 	enum { runs = 1000000 };
 
 	msleep(3000);
+
+	// GENERIC VERSION
 	for (i = 0; i < runs; ++i)
-		chacha20_crypt(&chacha20_state, block0, block0, sizeof(block0), false);
+		chacha20_crypt(&chacha20_state, block0, block0, CHACHA20_BLOCK_SIZE, false);
+
+	/* 1 block only */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, CHACHA20_BLOCK_SIZE, false);
+	end = get_cycles();
+
+	pr_err("generic 16 byts: %8x, %8x, %u cycles/10 per block\n", end, start, (end - start) / runs);
+
+	/* 180 block only, ~1440 mtu */
 	start = get_cycles();
 	for (i = 0; i < runs; ++i)
 		chacha20_crypt(&chacha20_state, block0, block0, sizeof(block0), false);
 	end = get_cycles();
 
-	pr_err("%d cycles/10 per block\n", (end - start) * 10 / runs);
-	
-	return 7;
+	pr_err("generic 1440 byts: %8x, %8x, %u cycles/10 per block\n", end, start, (end - start) / runs);
+
+
+	// MIPS VERSION
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt_mips(&chacha20_state, block0, block0, CHACHA20_BLOCK_SIZE, false);
+
+	/* 1 block only */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt_mips(&chacha20_state, block0, block0, CHACHA20_BLOCK_SIZE, false);
+	end = get_cycles();
+
+	pr_err("mips 16 byts: %8x, %8x, %u cycles/10 per block\n", end, start, (end - start) / runs);
+
+	/* 180 block only, ~1440 mtu */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt_mips(&chacha20_state, block0, block0, sizeof(block0), false);
+	end = get_cycles();
+
+	pr_err("mips 1440 byts: %8x, %8x, %u cycles/10 per block\n", end, start, (end - start) / runs);
+
+
+	success = 7;
 #endif
 
+#if 0
+	pr_info("Start poly1305 benchmark: ");
+	struct poly1305_internal {
+	    u32 h[5];
+	    u32 r[4];
+	};
+	u8 mac[16] = { 0 };
+	u32 nonce[4] = { 0 };
+	u8 key[16] = { 0 };
+	
+	struct poly1305_internal poly1305_ctx;
 
+	for (i = 0; i < runs; ++i) {
+		poly1305_init_generic(&poly1305_ctx, key);
+		poly1305_blocks_generic(&poly1305_ctx, block0, sizeof(block0), false);
+		poly1305_emit_generic(&poly1305_ctx, mac, nonce);
+	};
+
+	start = get_cycles();
+	for (i = 0; i < runs; ++i) {
+		poly1305_init_mips(&poly1305_ctx, key);
+		poly1305_blocks_mips(&poly1305_ctx, block0, sizeof(block0), false);
+		poly1305_emit_generic(&poly1305_ctx, mac, nonce);
+	};
+	end = get_cycles();
+
+	pr_err("%d mips: cycles/10 per block\n", (end - start) * 10 / runs);
+
+	start = get_cycles();
+	for (i = 0; i < runs; ++i) {
+		poly1305_init_generic(&poly1305_ctx, key);
+		poly1305_blocks_generic(&poly1305_ctx, block0, sizeof(block0), false);
+		poly1305_emit_generic(&poly1305_ctx, mac, nonce);
+	};
+	end = get_cycles();
+
+	pr_err("%d generic: cycles/10 per block\n", (end - start) * 10 / runs);
+
+
+	success = 7;
+
+#endif
+	
 	return success;
 }
 #endif

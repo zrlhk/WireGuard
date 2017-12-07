@@ -86,6 +86,11 @@ asmlinkage void poly1305_init_mips(void *ctx, const u8 key[16]);
 asmlinkage void poly1305_blocks_mips(void *ctx, const u8 *inp, size_t len, u32 padbit);
 asmlinkage void poly1305_emit_mips(void *ctx, u8 mac[16], const u32 nonce[4]);
 void __init chacha20poly1305_fpu_init(void) { }
+#elif defined(CONFIG_MIPS) && defined(CONFIG_32BIT)
+asmlinkage void poly1305_init_mips(void *ctx, const u8 key[16]);
+asmlinkage void poly1305_blocks_mips(void *ctx, const u8 *inp, size_t len, u32 padbit);
+asmlinkage void chacha20_block_mips(void *ctx, void *stream);
+void __init chacha20poly1305_fpu_init(void) { }
 #else
 void __init chacha20poly1305_fpu_init(void) { }
 #endif
@@ -281,6 +286,26 @@ no_simd:
 		crypto_xor(dst, buf, bytes);
 	}
 }
+
+static void chacha20_crypt_mips(struct chacha20_ctx *ctx, u8 *dst, const u8 *src, u32 bytes, bool have_simd)
+{
+	u8 buf[CHACHA20_BLOCK_SIZE];
+
+	if (dst != src)
+		memcpy(dst, src, bytes);
+
+	while (bytes >= CHACHA20_BLOCK_SIZE) {
+		chacha20_block_mips(ctx, buf);
+		crypto_xor(dst, buf, CHACHA20_BLOCK_SIZE);
+		bytes -= CHACHA20_BLOCK_SIZE;
+		dst += CHACHA20_BLOCK_SIZE;
+	}
+	if (bytes) {
+		chacha20_block_mips(ctx, buf);
+		crypto_xor(dst, buf, bytes);
+	}
+}
+
 typedef void (*poly1305_blocks_f)(void *ctx, const u8 *inp, size_t len, u32 padbit);
 typedef void (*poly1305_emit_f)(void *ctx, u8 mac[16], const u32 nonce[4]);
 
@@ -500,8 +525,11 @@ static void poly1305_init(struct poly1305_ctx *ctx, const u8 key[POLY1305_KEY_SI
 	poly1305_init_mips(ctx->opaque, key);
 	ctx->func.blocks = poly1305_blocks_mips;
 	ctx->func.emit = poly1305_emit_mips;
+#elif defined(CONFIG_MIPS) && defined(CONFIG_32BIT)
+	poly1305_init_mips(ctx->opaque, key);
+	ctx->func.blocks = poly1305_blocks_mips;
+	ctx->func.emit = poly1305_emit_generic;
 #else
-	poly1305_init_generic(ctx->opaque, key);
 #endif
 	ctx->num = 0;
 }
@@ -548,7 +576,7 @@ static void poly1305_update(struct poly1305_ctx *ctx, const u8 *inp, size_t len)
 
 static void poly1305_finish(struct poly1305_ctx *ctx, u8 mac[16])
 {
-#if defined(CONFIG_X86_64) || defined(CONFIG_ARM) || defined(CONFIG_ARM64) || (defined(CONFIG_MIPS) && defined(CONFIG_64BIT))
+#if defined(CONFIG_X86_64) || defined(CONFIG_ARM) || defined(CONFIG_ARM64) || defined(CONFIG_MIPS)
 	const poly1305_blocks_f blocks = ctx->func.blocks;
 	const poly1305_emit_f emit = ctx->func.emit;
 #else
