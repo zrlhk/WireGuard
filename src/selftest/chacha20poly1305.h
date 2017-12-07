@@ -294,6 +294,7 @@ bool __init chacha20poly1305_selftest(void)
 	u8 computed_result[3000];
 	bool success = true, ret;
 
+
 	for (i = 0; i < ARRAY_SIZE(chacha20poly1305_enc_vectors); ++i) {
 		memset(computed_result, 0, sizeof(computed_result));
 		chacha20poly1305_encrypt(computed_result, chacha20poly1305_enc_vectors[i].input, chacha20poly1305_enc_vectors[i].ilen, chacha20poly1305_enc_vectors[i].assoc, chacha20poly1305_enc_vectors[i].alen, le64_to_cpu(*(__force __le64 *)chacha20poly1305_enc_vectors[i].nonce), chacha20poly1305_enc_vectors[i].key);
@@ -328,6 +329,29 @@ bool __init chacha20poly1305_selftest(void)
 	}
 	if (success)
 		pr_info("chacha20poly1305 self-tests: pass\n");
+
+#if 1 
+	pr_info("Start chacha20 benchmark: ");
+
+	struct chacha20_ctx chacha20_state = chacha20_initial_state(chacha20poly1305_enc_vectors[0].key, (u8 *)&chacha20poly1305_enc_vectors->nonce);
+	u8 block0[CHACHA20_BLOCK_SIZE] = { 0 };
+	cycles_t start, end;
+	enum { runs = 1000000 };
+
+	msleep(3000);
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, sizeof(block0), false);
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, sizeof(block0), false);
+	end = get_cycles();
+
+	pr_err("%d cycles/10 per block\n", (end - start) * 10 / runs);
+	
+	return 7;
+#endif
+
+
 	return success;
 }
 #endif
