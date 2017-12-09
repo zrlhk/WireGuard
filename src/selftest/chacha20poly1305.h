@@ -330,7 +330,7 @@ bool __init chacha20poly1305_selftest(void)
 	if (success)
 		pr_info("chacha20poly1305 self-tests: pass\n");
 
-#if 1 
+#if 1
 	pr_info("Start chacha20 benchmark: ");
 
 	struct chacha20_ctx chacha20_state = chacha20_initial_state(chacha20poly1305_enc_vectors[0].key, (u8 *)&chacha20poly1305_enc_vectors->nonce);
@@ -340,6 +340,27 @@ bool __init chacha20poly1305_selftest(void)
 	enum { runs = 1000000 };
 
 	msleep(3000);
+
+	// MIPS FULL ASM VERSION
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt_mips_asm(&chacha20_state, block0, block0, CHACHA20_BLOCK_SIZE);
+
+	/* 1 block only */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt_mips_asm(&chacha20_state, block0, block0, CHACHA20_BLOCK_SIZE);
+	end = get_cycles();
+
+	pr_err("mips_asm: 16 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
+
+	/* 180 block only, ~1440 mtu */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt_mips_asm(&chacha20_state, block0, block0, sizeof(block0));
+	end = get_cycles();
+
+	pr_err("mips_asm: 1440 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
+
 
 	// GENERIC VERSION
 	for (i = 0; i < runs; ++i)
@@ -351,7 +372,7 @@ bool __init chacha20poly1305_selftest(void)
 		chacha20_crypt(&chacha20_state, block0, block0, CHACHA20_BLOCK_SIZE, false);
 	end = get_cycles();
 
-	pr_err("generic 16 byts: %8x, %8x, %u cycles/10 per block\n", end, start, (end - start) / runs);
+	pr_err("generic 16 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
 
 	/* 180 block only, ~1440 mtu */
 	start = get_cycles();
@@ -359,7 +380,7 @@ bool __init chacha20poly1305_selftest(void)
 		chacha20_crypt(&chacha20_state, block0, block0, sizeof(block0), false);
 	end = get_cycles();
 
-	pr_err("generic 1440 byts: %8x, %8x, %u cycles/10 per block\n", end, start, (end - start) / runs);
+	pr_err("generic 1440 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
 
 
 	// MIPS VERSION
@@ -372,7 +393,7 @@ bool __init chacha20poly1305_selftest(void)
 		chacha20_crypt_mips(&chacha20_state, block0, block0, CHACHA20_BLOCK_SIZE, false);
 	end = get_cycles();
 
-	pr_err("mips 16 byts: %8x, %8x, %u cycles/10 per block\n", end, start, (end - start) / runs);
+	pr_err("mips 16 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
 
 	/* 180 block only, ~1440 mtu */
 	start = get_cycles();
@@ -380,10 +401,10 @@ bool __init chacha20poly1305_selftest(void)
 		chacha20_crypt_mips(&chacha20_state, block0, block0, sizeof(block0), false);
 	end = get_cycles();
 
-	pr_err("mips 1440 byts: %8x, %8x, %u cycles/10 per block\n", end, start, (end - start) / runs);
+	pr_err("mips 1440 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
 
 
-	success = 7;
+	// success = 7;
 #endif
 
 #if 0
@@ -412,7 +433,7 @@ bool __init chacha20poly1305_selftest(void)
 	};
 	end = get_cycles();
 
-	pr_err("%d mips: cycles/10 per block\n", (end - start) * 10 / runs);
+	pr_err("%d mips: cycles per block\n", (end - start) * 10 / runs);
 
 	start = get_cycles();
 	for (i = 0; i < runs; ++i) {
@@ -422,10 +443,10 @@ bool __init chacha20poly1305_selftest(void)
 	};
 	end = get_cycles();
 
-	pr_err("%d generic: cycles/10 per block\n", (end - start) * 10 / runs);
+	pr_err("%d generic: cycles per block\n", (end - start) * 10 / runs);
 
 
-	success = 7;
+	//success = 7;
 
 #endif
 	
