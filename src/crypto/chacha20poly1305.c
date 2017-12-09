@@ -296,6 +296,9 @@ static void chacha20_crypt_generic(struct chacha20_ctx *ctx, u8 *dst, const u8 *
 {
 	u8 buf[CHACHA20_BLOCK_SIZE];
 
+	if (!bytes)
+		return;
+
 	if (!have_simd
 #if defined(CONFIG_X86_64)
 		|| !chacha20poly1305_use_ssse3
@@ -343,13 +346,9 @@ no_simd:
 
 	while (bytes >= CHACHA20_BLOCK_SIZE) {
 		chacha20_block_generic(ctx, buf);
-		crypto_xor(dst, buf, CHACHA20_BLOCK_SIZE);
+		crypto_xor(dst, buf, bytes>=CHACHA20_BLOCK_SIZE ? CHACHA20_BLOCK_SIZE : bytes);
 		bytes -= CHACHA20_BLOCK_SIZE;
 		dst += CHACHA20_BLOCK_SIZE;
-	}
-	if (bytes) {
-		chacha20_block_generic(ctx, buf);
-		crypto_xor(dst, buf, bytes);
 	}
 }
 
