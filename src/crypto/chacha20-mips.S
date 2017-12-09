@@ -332,9 +332,8 @@ chacha20_block_mips:
 #define CRYPT_CTX	$s0
 #define CRYPT_DST	$s1
 #define CRYPT_SRC	$a2
-#define CRYPT_BYTES	$s3
-#define CRYPT_NB	$s4
-#define CRYPT_LT_BLOCK	$s5
+#define CRYPT_BYTES	$s2
+#define CRYPT_LT_BLOCK	$s3
 
 #define CRYPT_BUF (4*16)
 
@@ -364,8 +363,6 @@ chacha20_crypt_mips_asm:
 	sw	$s1, PTR_STACK(2)
 	sw	$s2, PTR_STACK(3)
 	sw	$s3, PTR_STACK(4)
-	sw	$s4, PTR_STACK(5)
-	sw	$s5, PTR_STACK(6)
 
 	// Store input variables in Save registers for later
 	move	CRYPT_CTX, CRYPT_IN_CTX
@@ -373,7 +370,7 @@ chacha20_crypt_mips_asm:
 	move	CRYPT_BYTES, CRYPT_IN_BYTES
 
 	// skip memorycopy if DST=SRC
-	beq	CRYPT_IN_DST, CRYPT_IN_SRC, .Lcrypt_skip_memcpy
+	beq	CRYPT_IN_DST, CRYPT_IN_SRC, .Lcrypt_loop_full_block
 	nop
 
 #undef 	CRYPT_IN_DST
@@ -389,25 +386,11 @@ chacha20_crypt_mips_asm:
 	jal	memcpy
 	nop
 
-
-
-
-.Lcrypt_skip_memcpy:
-	// Jump to the nonfull block
-	sltiu	CRYPT_LT_BLOCK, CRYPT_BYTES, CHACHA20_BLOCK_SIZE
-	bnez	CRYPT_LT_BLOCK, .Lcrypt_nonfull_block
-	nop
-
 .Lcrypt_loop_full_block:
-/*
-	// set CRYPT_NB = CHACHA20_BLOCK_SIZE unless  CRYPT_BYTES < CHACHA20_BLOCK_SIZE
-	// CRYPT_NB =  CRYPT_BYTES < CHACHA20_BLOCK_SIZE ? CHACHA20_BLOCK_SIZE : CRYPT_BYTES 
-	li	CRYPT_NB, CHACHA20_BLOCK_SIZE
-	sltiu	CRYPT_LT_BLOCK, CRYPT_BYTES, CHACHA20_BLOCK_SIZE
-	movn	CRYPT_NB, CRYPT_BYTES, CRYPT_LT_BLOCK
-*/
 
-	addiu	CRYPT_BYTES, -CHACHA20_BLOCK_SIZE
+	// set CRYPT_NB = CHACHA20_BLOCK_SIZE unless  CRYPT_BYTES < CHACHA20_BLOCK_SIZE
+	// CRYPT_NB =  CRYPT_BYTES <= CHACHA20_BLOCK_SIZE ? CHACHA20_BLOCK_SIZE : CRYPT_BYTES 
+	sltiu	CRYPT_LT_BLOCK, CRYPT_BYTES, (CHACHA20_BLOCK_SIZE+1)
 
 	// chacha20_block_generic(ctx, buf);
 	move	$a0, CRYPT_CTX
@@ -416,45 +399,21 @@ chacha20_crypt_mips_asm:
 	jal	chacha20_block_mips
 	nop
 
-	// CRYPT_LT_BLOCK = (CRYPT_BYTES < CACHA20_BLOCK_SIZE);
-	sltiu	CRYPT_LT_BLOCK, CRYPT_BYTES, CHACHA20_BLOCK_SIZE
-
+	li	$a3, CHACHA20_BLOCK_SIZE
 	// __crypto_xor(dst, src1, src2, size);
 	move	$a0, CRYPT_DST
 	move	$a1, CRYPT_DST
 	// location of buf
 	addiu	$a2, $sp, CRYPT_BUF
-	li	$a3, CHACHA20_BLOCK_SIZE
+	movn	$a3, CRYPT_BYTES, CRYPT_LT_BLOCK
 	jal	__crypto_xor
 	nop
 
+	addiu	CRYPT_BYTES, -CHACHA20_BLOCK_SIZE
 	addiu	CRYPT_DST, CHACHA20_BLOCK_SIZE
 
 	// test number of bytes
 	beqz	CRYPT_LT_BLOCK, .Lcrypt_loop_full_block
-	nop
-
-.Lcrypt_nonfull_block:
-
-	// Check if anything to do else jump back.
-	beqz	CRYPT_BYTES, .Lcrypt_end
-	nop
-
-	// chacha20_block_generic(ctx, buf);
-	move	$a0, CRYPT_CTX
-	// location of buf
-	addiu	$a1, $sp, CRYPT_BUF
-	jal	chacha20_block_mips
-	nop
-
-
-	// __crypto_xor(dst, src1, src2, size);
-	move	$a0, CRYPT_DST
-	move	$a1, CRYPT_DST
-	// location of buf
-	addiu	$a2, $sp, CRYPT_BUF
-	move	$a3, CRYPT_BYTES
-	jal	__crypto_xor
 	nop
 
 .Lcrypt_end:
@@ -463,8 +422,6 @@ chacha20_crypt_mips_asm:
 	lw	$s1, PTR_STACK(2)
 	lw	$s2, PTR_STACK(3)
 	lw	$s3, PTR_STACK(4)
-	lw	$s4, PTR_STACK(5)
-	lw	$s5, PTR_STACK(6)
 
 	addiu $sp, stack_size_crypt
 
