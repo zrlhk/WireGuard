@@ -274,20 +274,81 @@ no_simd:
 #endif
 #if defined(CONFIG_MIPS)
 	chacha20_crypt_mips_asm(ctx, dst, src, bytes);
-	return;
 #endif
+	return;
 
 	if (dst != src)
 		memcpy(dst, src, bytes);
 
 	while (bytes >= CHACHA20_BLOCK_SIZE) {
-		chacha20_block_mips(ctx, buf);
+		chacha20_block_generic(ctx, buf);
 		crypto_xor(dst, buf, CHACHA20_BLOCK_SIZE);
 		bytes -= CHACHA20_BLOCK_SIZE;
 		dst += CHACHA20_BLOCK_SIZE;
 	}
 	if (bytes) {
-		chacha20_block_mips(ctx, buf);
+		chacha20_block_generic(ctx, buf);
+		crypto_xor(dst, buf, bytes);
+	}
+}
+
+static void chacha20_crypt_generic(struct chacha20_ctx *ctx, u8 *dst, const u8 *src, u32 bytes, bool have_simd)
+{
+	u8 buf[CHACHA20_BLOCK_SIZE];
+
+	if (!have_simd
+#if defined(CONFIG_X86_64)
+		|| !chacha20poly1305_use_ssse3
+
+#elif defined(ARM_USE_NEON)
+		|| !chacha20poly1305_use_neon
+#endif
+	)
+		goto no_simd;
+
+#if defined(CONFIG_X86_64)
+#ifdef CONFIG_AS_AVX512
+	if (chacha20poly1305_use_avx512) {
+		chacha20_avx512(dst, src, bytes, &ctx->state[4], &ctx->state[12]);
+		ctx->state[12] += (bytes + 63) / 64;
+		return;
+	}
+#endif
+#ifdef CONFIG_AS_AVX2
+	if (chacha20poly1305_use_avx2) {
+		chacha20_avx2(dst, src, bytes, &ctx->state[4], &ctx->state[12]);
+		ctx->state[12] += (bytes + 63) / 64;
+		return;
+	}
+#endif
+#ifdef CONFIG_AS_SSSE3
+	chacha20_ssse3(dst, src, bytes, &ctx->state[4], &ctx->state[12]);
+	ctx->state[12] += (bytes + 63) / 64;
+	return;
+#endif
+#elif defined(ARM_USE_NEON)
+	chacha20_neon(dst, src, bytes, &ctx->state[4], &ctx->state[12]);
+	ctx->state[12] += (bytes + 63) / 64;
+	return;
+#endif
+
+no_simd:
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+	chacha20_arm(dst, src, bytes, &ctx->state[4], &ctx->state[12]);
+	ctx->state[12] += (bytes + 63) / 64;
+	return;
+#endif
+	if (dst != src)
+		memcpy(dst, src, bytes);
+
+	while (bytes >= CHACHA20_BLOCK_SIZE) {
+		chacha20_block_generic(ctx, buf);
+		crypto_xor(dst, buf, CHACHA20_BLOCK_SIZE);
+		bytes -= CHACHA20_BLOCK_SIZE;
+		dst += CHACHA20_BLOCK_SIZE;
+	}
+	if (bytes) {
+		chacha20_block_generic(ctx, buf);
 		crypto_xor(dst, buf, bytes);
 	}
 }
