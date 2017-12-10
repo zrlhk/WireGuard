@@ -337,7 +337,7 @@ bool __init chacha20poly1305_selftest(void)
 	
 	u8 block0[1440] = { 0 };
 	cycles_t start, end;
-	enum { runs = 1000000 };
+	enum { runs = 1000 };
 
 	msleep(3000);
 

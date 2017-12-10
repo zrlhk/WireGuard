@@ -399,6 +399,7 @@ chacha20_crypt_mips_asm:
 	jal	chacha20_block_mips
 	nop
 
+/*
 	li	$a3, CHACHA20_BLOCK_SIZE
 	// __crypto_xor(dst, src1, src2, size);
 	move	$a0, CRYPT_DST
@@ -407,6 +408,17 @@ chacha20_crypt_mips_asm:
 	addiu	$a2, $sp, CRYPT_BUF
 	movn	$a3, CRYPT_BYTES, CRYPT_LT_BLOCK
 	jal	__crypto_xor
+	nop
+*/
+
+# Linux kernel 4.9
+	li	$a2, CHACHA20_BLOCK_SIZE
+	// __crypto_xor(dst, src1, src2, size);
+	move	$a0, CRYPT_DST
+	// location of buf
+	addiu	$a1, $sp, CRYPT_BUF
+	movn	$a2, CRYPT_BYTES, CRYPT_LT_BLOCK
+	jal	crypto_xor
 	nop
 
 	addiu	CRYPT_BYTES, -CHACHA20_BLOCK_SIZE
