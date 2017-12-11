@@ -336,8 +336,11 @@ bool __init chacha20poly1305_selftest(void)
 	struct chacha20_ctx chacha20_state = chacha20_initial_state(chacha20poly1305_enc_vectors[0].key, (u8 *)&chacha20poly1305_enc_vectors->nonce);
 	
 	u8 block0[1440] = { 0 };
+	
+	pr_info("address block0: %x", &block0);
+	
 	cycles_t start, end;
-	enum { runs = 1000 };
+	enum { runs = 512 };
 
 	msleep(3000);
 
