@@ -89,7 +89,7 @@ void __init chacha20poly1305_fpu_init(void) { }
 #elif defined(CONFIG_MIPS) && defined(CONFIG_32BIT)
 asmlinkage void poly1305_init_mips(void *ctx, const u8 key[16]);
 asmlinkage void poly1305_blocks_mips(void *ctx, const u8 *inp, size_t len, u32 padbit);
-asmlinkage void chacha20_block_mips(void *ctx, void *stream);
+asmlinkage void chacha20_block_mips(void *ctx);
 asmlinkage void chacha20_crypt_mips_asm(void *ctx, u8 *dst, const u8 *src, u32 bytes);
 void __init chacha20poly1305_fpu_init(void) { }
 #else
@@ -122,6 +122,7 @@ static inline u32 rotl32(u32 v, u8 n)
 
 struct chacha20_ctx {
 	u32 state[CHACHA20_BLOCK_SIZE / sizeof(u32)];
+	u8 stream[CHACHA20_BLOCK_SIZE];
 } __aligned(32);
 
 #define QUARTER_ROUND(x, a, b, c, d) ( \
@@ -163,10 +164,10 @@ struct chacha20_ctx {
 	DOUBLE_ROUND(x) \
 )
 
-static void chacha20_block_generic(struct chacha20_ctx *ctx, void *stream)
+static void chacha20_block_generic(struct chacha20_ctx *ctx)
 {
 	u32 x[CHACHA20_BLOCK_SIZE / sizeof(u32)];
-	__le32 *out = stream;
+	__le32 *out = (__force __le32 *)ctx->stream;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(x); i++)
@@ -223,8 +224,6 @@ static inline void hchacha20(u8 derived_key[CHACHA20POLY1305_KEYLEN], const u8 n
 
 static void chacha20_crypt(struct chacha20_ctx *ctx, u8 *dst, const u8 *src, u32 bytes, bool have_simd)
 {
-	u8 buf[CHACHA20_BLOCK_SIZE];
-
 	if (!have_simd
 #if defined(CONFIG_X86_64)
 		|| !chacha20poly1305_use_ssse3
@@ -281,24 +280,19 @@ no_simd:
 		memcpy(dst, src, bytes);
 
 	while (bytes >= CHACHA20_BLOCK_SIZE) {
-		chacha20_block_generic(ctx, buf);
-		crypto_xor(dst, buf, CHACHA20_BLOCK_SIZE);
+		chacha20_block_generic(ctx);
+		crypto_xor(dst, ctx->stream, CHACHA20_BLOCK_SIZE);
 		bytes -= CHACHA20_BLOCK_SIZE;
 		dst += CHACHA20_BLOCK_SIZE;
 	}
 	if (bytes) {
-		chacha20_block_generic(ctx, buf);
-		crypto_xor(dst, buf, bytes);
+		chacha20_block_generic(ctx);
+		crypto_xor(dst, ctx->stream, bytes);
 	}
 }
 
 static void chacha20_crypt_generic(struct chacha20_ctx *ctx, u8 *dst, const u8 *src, u32 bytes, bool have_simd)
 {
-	u8 buf[CHACHA20_BLOCK_SIZE];
-
-	if (!bytes)
-		return;
-
 	if (!have_simd
 #if defined(CONFIG_X86_64)
 		|| !chacha20poly1305_use_ssse3
@@ -345,29 +339,32 @@ no_simd:
 		memcpy(dst, src, bytes);
 
 	while (bytes >= CHACHA20_BLOCK_SIZE) {
-		chacha20_block_generic(ctx, buf);
-		crypto_xor(dst, buf, bytes>=CHACHA20_BLOCK_SIZE ? CHACHA20_BLOCK_SIZE : bytes);
-		bytes -= CHACHA20_BLOCK_SIZE;
-		dst += CHACHA20_BLOCK_SIZE;
-	}
-}
-
-static void chacha20_crypt_mips(struct chacha20_ctx *ctx, u8 *dst, const u8 *src, u32 bytes, bool have_simd)
-{
-	u8 buf[CHACHA20_BLOCK_SIZE];
-
-	if (dst != src)
-		memcpy(dst, src, bytes);
-
-	while (bytes >= CHACHA20_BLOCK_SIZE) {
-		chacha20_block_mips(ctx, buf);
-		crypto_xor(dst, buf, CHACHA20_BLOCK_SIZE);
+		chacha20_block_generic(ctx);
+		crypto_xor(dst, ctx->stream, CHACHA20_BLOCK_SIZE);
 		bytes -= CHACHA20_BLOCK_SIZE;
 		dst += CHACHA20_BLOCK_SIZE;
 	}
 	if (bytes) {
-		chacha20_block_mips(ctx, buf);
-		crypto_xor(dst, buf, bytes);
+		chacha20_block_generic(ctx);
+		crypto_xor(dst, ctx->stream, bytes);
+	}
+
+}
+
+static void chacha20_crypt_mips(struct chacha20_ctx *ctx, u8 *dst, const u8 *src, u32 bytes, bool have_simd)
+{
+	if (dst != src)
+		memcpy(dst, src, bytes);
+
+	while (bytes >= CHACHA20_BLOCK_SIZE) {
+		chacha20_block_mips(ctx);
+		crypto_xor(dst, ctx->stream, CHACHA20_BLOCK_SIZE);
+		bytes -= CHACHA20_BLOCK_SIZE;
+		dst += CHACHA20_BLOCK_SIZE;
+	}
+	if (bytes) {
+		chacha20_block_mips(ctx);
+		crypto_xor(dst, ctx->stream, bytes);
 	}
 }
 

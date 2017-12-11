@@ -5,9 +5,9 @@
 
 #include <linux/linkage.h>
 
-#define CHACHA20_CTX_STATE 0
-#define CHACHA20_CTX_STREAM (4*16)
 #define CHACHA20_BLOCK_SIZE 64
+#define CHACHA20_CTX_STATE 0
+#define CHACHA20_CTX_STREAM (CHACHA20_CTX_STATE + CHACHA20_BLOCK_SIZE)
 
 #ifndef CONFIG_32BIT
 #error Only 32-bits
@@ -122,10 +122,10 @@ chacha20_keysetup:
 #define T1  $s7
 #define T2  $a2
 #define T3  $a3
+
 #define T(n) T ## n
 #define X(n) X ## n
 #define __in_ctx_p $a0
-#define __out_stream_p $a1
 
 #define stack_size (20*4)
 
@@ -144,7 +144,7 @@ chacha20_keysetup:
 	rotl X(Z), S;
 
 #define PTR_CHACHA20_STATE(x)  (x*4) ## (__in_ctx_p)
-#define PTR_CHACHA20_STREAM(x) (x*4) ## (__out_stream_p)
+#define PTR_CHACHA20_STREAM(x) (CHACHA20_CTX_STREAM + (x*4)) ## (__in_ctx_p)
 
 #define LOAD_ctx(R)        lw X(R), PTR_CHACHA20_STATE(R);
 #define STORE_ctx(R)       sw X(R), PTR_CHACHA20_STATE(R);
@@ -335,7 +335,7 @@ chacha20_block_mips:
 #define CRYPT_BYTES	$s2
 #define CRYPT_LT_BLOCK	$s3
 
-#define CRYPT_BUF (4*16)
+#define CRYPT_BUF  (CHACHA20_CTX_STREAM)
 
 #define PTR_STACK(x)  (x*4) ## ($sp)
 
@@ -392,10 +392,9 @@ chacha20_crypt_mips_asm:
 	// CRYPT_NB =  CRYPT_BYTES <= CHACHA20_BLOCK_SIZE ? CHACHA20_BLOCK_SIZE : CRYPT_BYTES 
 	sltiu	CRYPT_LT_BLOCK, CRYPT_BYTES, (CHACHA20_BLOCK_SIZE+1)
 
-	// chacha20_block_generic(ctx, buf);
-	move	$a0, CRYPT_CTX
+	// chacha20_block_generic(ctx);
 	// location of buf
-	addiu	$a1, $sp, CRYPT_BUF
+	move	$a0, CRYPT_CTX
 	jal	chacha20_block_mips
 	nop
 
@@ -416,12 +415,13 @@ chacha20_crypt_mips_asm:
 	// __crypto_xor(dst, src1, src2, size);
 	move	$a0, CRYPT_DST
 	// location of buf
-	addiu	$a1, $sp, CRYPT_BUF
+	addiu	$a1, CRYPT_CTX, CRYPT_BUF
 	movn	$a2, CRYPT_BYTES, CRYPT_LT_BLOCK
 	jal	crypto_xor
 	nop
 
 	addiu	CRYPT_BYTES, -CHACHA20_BLOCK_SIZE
+
 	addiu	CRYPT_DST, CHACHA20_BLOCK_SIZE
 
 	// test number of bytes
