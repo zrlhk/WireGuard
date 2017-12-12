@@ -334,10 +334,25 @@ bool __init chacha20poly1305_selftest(void)
 	pr_info("Start chacha20 benchmark: ");
 
 	struct chacha20_ctx chacha20_state = chacha20_initial_state(chacha20poly1305_enc_vectors[0].key, (u8 *)&chacha20poly1305_enc_vectors->nonce);
+	struct chacha20_ctx chacha20_state_mips = chacha20_initial_state(chacha20poly1305_enc_vectors[0].key, (u8 *)&chacha20poly1305_enc_vectors->nonce);
+	
+/*	
+	// chacha20 block test.
+	chacha20_block_generic(&chacha20_state);
+	chacha20_block_mips(&chacha20_state_mips);
+	
+	u8 *ctx_generic = (char *)&chacha20_state;
+	u8 *ctx_mips = (char *)&chacha20_state_mips;
+	
+	
+	
+	for ( i = 0; i < sizeof(struct chacha20_ctx); i++ )
+		pr_err("%3d, %8x - %8x\n", i, ctx_generic[i], ctx_mips[i]);
+*/
 	
 	u8 block0[1440] = { 0 };
 	
-	pr_info("address block0: %x", &block0);
+	chacha20_crypt_mips(&chacha20_state, block0, block0, CHACHA20_BLOCK_SIZE, false);
 	
 	cycles_t start, end;
 	enum { runs = 512 };

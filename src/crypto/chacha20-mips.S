@@ -7,7 +7,7 @@
 
 #define CHACHA20_BLOCK_SIZE 64
 #define CHACHA20_CTX_STATE_OFFSET 0
-#define CHACHA20_CTX_STREAM_OFFSET (CHACHA20_CTX_STATE_OFFSET + CHACHA20_BLOCK_SIZE)
+#define CHACHA20_CTX_STREAM_OFFSET (CHACHA20_BLOCK_SIZE)
 
 #ifndef CONFIG_32BIT
 #error Only 32-bits
@@ -156,13 +156,14 @@ chacha20_keysetup:
 // static void chacha20_block_generic(struct chacha20_ctx *ctx, void *stream)
 
 .align 4
-.set noat
+//.set noat
 .set noreorder
 .globl chacha20_block_mips
 .ent chacha20_block_mips
 chacha20_block_mips:
 	// store the used save registers.
 	addiu	$sp, -(stack_size)
+	
 	// Load all chacha settings.
 	LOAD_ctx(0)
 	LOAD_ctx(1)
@@ -172,6 +173,8 @@ chacha20_block_mips:
 	LOAD_ctx(5)
 	LOAD_ctx(6)
 	LOAD_ctx(7)
+
+
 	// store the used save registers.
 	sw  $s0, 0($sp)
 	sw  $s1, 4($sp)
@@ -202,11 +205,12 @@ chacha20_block_mips:
 	AXR(10,11, 8, 9, 15,12,13,14,  5, 6, 7, 4, 12);
 	AXR( 0, 1, 2, 3,  5, 6, 7, 4, 15,12,13,14,  8);
 	AXR(10,11, 8, 9, 15,12,13,14,  5, 6, 7, 4,  7);
-	// decrease loop counter, make use of delay slot.
-	addiu	loop_cnt, -2
+.set noreorder
 	// loop_cnt if T(0) != 0
 	bnez	loop_cnt, .Loop_chacha_rounds
-	nop
+	// decrease loop counter, make use of delay slot.
+	addiu	loop_cnt, -2
+.set reorder
 	
 	LOAD_ctx_TMP(0,0)
 	LOAD_ctx_TMP(1,1)
@@ -277,6 +281,7 @@ chacha20_block_mips:
 	rotr 	X(14), 16
 	rotr 	X(15), 16
 #endif
+
 	STORE_stream(0)
 	STORE_stream(1)
 	STORE_stream(2)
@@ -302,6 +307,7 @@ chacha20_block_mips:
 	lw  $s5, 20($sp)
 	lw  $s6, 24($sp)
 	lw  $s7, 28($sp)
+	
 	addiu	$sp, stack_size
 	// Jump Back
 	jr	$ra
@@ -366,11 +372,12 @@ chacha20_block_xor_mips:
 	AXR(10,11, 8, 9, 15,12,13,14,  5, 6, 7, 4, 12);
 	AXR( 0, 1, 2, 3,  5, 6, 7, 4, 15,12,13,14,  8);
 	AXR(10,11, 8, 9, 15,12,13,14,  5, 6, 7, 4,  7);
-	// decrease loop counter, make use of delay slot.
-	addiu	loop_cnt, -2
+.set noreorder
 	// loop_cnt if T(0) != 0
 	bnez	loop_cnt, .Loop_chacha_xor_rounds
-	nop
+	// decrease loop counter, make use of delay slot.
+	addiu	loop_cnt, -2
+.set reorder
 	
 	LOAD_ctx_TMP(0,0)
 	LOAD_ctx_TMP(1,1)
@@ -558,15 +565,17 @@ chacha20_block_xor_mips:
 .ent chacha20_crypt_mips_asm
 chacha20_crypt_mips_asm:
 	
-	// Check Bytes = 0 then return
-	bgt    CRYPT_IN_BYTES, $zero, .Lcrypt_start
+	/*
+	 * Check Bytes = 0 then return
+	 */
+	beqz    CRYPT_IN_BYTES, .Lcrypt_end1
 	nop
-	jr	$ra
-	nop
-
+	
 .Lcrypt_start:
 
-	// store the used save registers.
+	/*
+	 * store the used save registers.
+	 */
 	addiu	$sp, -(stack_size_crypt)
 
 	// store the used save registers.
@@ -580,21 +589,23 @@ chacha20_crypt_mips_asm:
 	sw	$s6, PTR_STACK(7)
 	sw	$s7, PTR_STACK(8)
 
+
+	sw	$a0, PTR_STACK(8)
+	sw	$a1, PTR_STACK(9)
+	sw	$a2, PTR_STACK(10)
+	sw	$a3, PTR_STACK(11)
+
 	// Store input variables in Save registers for later
 	move	CRYPT_CTX, CRYPT_IN_CTX
 	move	CRYPT_DST, CRYPT_IN_DST
 	move	CRYPT_SRC, CRYPT_IN_SRC
 	move	CRYPT_BYTES, CRYPT_IN_BYTES
 
+	li	CRYPT_LAST_BLOCK, CHACHA20_BLOCK_SIZE
 
 	// skip memorycopy if DST=SRC
 	beq	CRYPT_IN_DST, CRYPT_IN_SRC, .Lcrypt_loop_skip_memcpy
 	nop
-
-#undef 	CRYPT_IN_DST
-#undef 	CRYPT_IN_BYTES
-#undef 	CRYPT_IN_CTX
-#undef 	CRYPT_IN_SRC
 
 	// setup memcpy vars.
 	move	$a0, CRYPT_DST
@@ -604,35 +615,48 @@ chacha20_crypt_mips_asm:
 	jal	memcpy
 	nop
 
-
 .Lcrypt_loop_skip_memcpy:
 	// Check bytes less then CHACHA20_BLOCK_SIZE then jump .Lcrypt_nonfull_block
-	sltiu	CRYPT_LAST_BLOCK, CRYPT_BYTES, CHACHA20_BLOCK_SIZE
-	bnez	CRYPT_LAST_BLOCK, .Lcrypt_nonfull_block
+	blt	CRYPT_BYTES, CRYPT_LAST_BLOCK, .Lcrypt_nonfull_block
 	nop
 
 .Lcrypt_loop_full_block:
-	// Set CRYPT_LAST_BLOCK = 1 if CRYPT_BYTES < (CHACHA20_BLOCK_SIZE + 1)
-	sltiu	CRYPT_LAST_BLOCK, CRYPT_BYTES, (CHACHA20_BLOCK_SIZE + 1)
+	// Decresse bytes
+	addiu	CRYPT_BYTES, -(CHACHA20_BLOCK_SIZE)
 
+/* 
 	// chacha20_block_generic(ctx);
 	// location of buf
 	move	$a0, CRYPT_CTX
 	move	$a1, CRYPT_DST
 	jal	chacha20_block_xor_mips
 	nop
+*/
 
-	addi	CRYPT_BYTES, -(CHACHA20_BLOCK_SIZE)
+
+	// chacha20_block_generic(ctx);
+	// location of buf
+	move	$a0, CRYPT_CTX
+	jal	chacha20_block_mips
+	nop
+
+	// xor
+	move	$a0, CRYPT_DST
+	addiu	$a1, CRYPT_CTX, CHACHA20_CTX_STREAM_OFFSET
+	li	$a2, CHACHA20_BLOCK_SIZE
+	jal 	crypto_xor
+	nop
+
+	// inc DST address for next round.
 	addiu	CRYPT_DST, CHACHA20_BLOCK_SIZE
 
 	// Last Full Block?
-	beqz	CRYPT_LAST_BLOCK, .Lcrypt_loop_full_block
+	bge	CRYPT_BYTES, CRYPT_LAST_BLOCK, .Lcrypt_loop_full_block
 	nop
 // ### END .Lcrypt_loop_full_block:
 
 	// No bytes left, 
-	blez	CRYPT_BYTES, .Lcrypt_done
-//	beqz	CRYPT_BYTES, .Lcrypt_done
+	beqz	CRYPT_BYTES, .Lcrypt_done
 	nop
 
 .Lcrypt_nonfull_block:
@@ -641,16 +665,23 @@ chacha20_crypt_mips_asm:
 	move	$a0, CRYPT_CTX
 	jal	chacha20_block_mips
 	nop
-
+/*
 .Loop_xor_byte:
 	addi	CRYPT_BYTES, -1
 	lbu	$a0, 0(CRYPT_DST)
 	lbu 	$a1, 64(CRYPT_CTX)
 	addiu	CRYPT_CTX, 1
 	xor	$a0, $a1
-	//sb	$a0, 0(CRYPT_DST)
+	sb	$a0, 0(CRYPT_DST)
 	addiu	CRYPT_DST, 1
 	bnez	CRYPT_BYTES, .Loop_xor_byte
+	nop
+*/
+
+	move	$a0, CRYPT_DST
+	addiu	$a1, CRYPT_CTX, CHACHA20_CTX_STREAM_OFFSET
+	move	$a2, CRYPT_BYTES
+	jal 	crypto_xor
 	nop
 
 .Lcrypt_done:

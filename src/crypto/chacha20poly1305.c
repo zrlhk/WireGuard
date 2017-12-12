@@ -272,21 +272,21 @@ no_simd:
 	return;
 #endif
 #if defined(CONFIG_MIPS)
-	chacha20_crypt_mips_asm(ctx, dst, src, bytes);
+	//chacha20_crypt_mips_asm(ctx, dst, src, bytes);
 #endif
-	return;
+	//return;
 
 	if (dst != src)
 		memcpy(dst, src, bytes);
 
 	while (bytes >= CHACHA20_BLOCK_SIZE) {
-		chacha20_block_generic(ctx);
+		chacha20_block_mips(ctx);
 		crypto_xor(dst, ctx->stream, CHACHA20_BLOCK_SIZE);
 		bytes -= CHACHA20_BLOCK_SIZE;
 		dst += CHACHA20_BLOCK_SIZE;
 	}
 	if (bytes) {
-		chacha20_block_generic(ctx);
+		chacha20_block_mips(ctx);
 		crypto_xor(dst, ctx->stream, bytes);
 	}
 }
