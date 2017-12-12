@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: (GPL-2.0 OR OpenSSL OR CRYPTOGAMS)
+/* SPDX-License-Identifier: (GPL-2.0)
  *
  * Copyright (C) 2016-2017 René van Dorst <opensource@vdorst.com>. All Rights Reserved.
+ * Based on the C code.
  */
 
 #include <linux/linkage.h>
@@ -329,7 +330,7 @@ chacha20_block_mips:
 .set noat
 .set noreorder
 .globl chacha20_block_xor_mips
-.ent chacha20_block_xor_mips
+.ent   chacha20_block_xor_mips
 chacha20_block_xor_mips:
 	// store the used save registers.
 	addiu	$sp, -(stack_size)
@@ -448,6 +449,27 @@ chacha20_block_xor_mips:
 	rotr 	X(14), 16
 	rotr 	X(15), 16
 #endif
+
+	/* Temp for debugging */
+#if defined(CONFIG_WIREGUARD_DEBUG)
+	STORE_stream(0)
+	STORE_stream(1)
+	STORE_stream(2)
+	STORE_stream(3)
+	STORE_stream(4)
+	STORE_stream(5)
+	STORE_stream(6)
+	STORE_stream(7)
+	STORE_stream(8)
+	STORE_stream(9)
+	STORE_stream(10)
+	STORE_stream(11)
+	STORE_stream(12)
+	STORE_stream(13)
+	STORE_stream(14)
+	STORE_stream(15)
+#endif
+
 	LOAD_data_TMP(0,0)
 	LOAD_data_TMP(1,1)
 	LOAD_data_TMP(2,2)
@@ -456,11 +478,6 @@ chacha20_block_xor_mips:
 	xor  X1, T1
 	xor  X2, T2
 	xor  X3, T3
-	STORE_xordata(0)
-	STORE_xordata(1)
-	STORE_xordata(2)
-	STORE_xordata(3)
-
 	LOAD_data_TMP(4,0)
 	LOAD_data_TMP(5,1)
 	LOAD_data_TMP(6,2)
@@ -469,11 +486,6 @@ chacha20_block_xor_mips:
 	xor  X5, T1
 	xor  X6, T2
 	xor  X7, T3
-	STORE_xordata(4)
-	STORE_xordata(5)
-	STORE_xordata(6)
-	STORE_xordata(7)
-
 	LOAD_data_TMP(8,0)
 	LOAD_data_TMP(9,1)
 	LOAD_data_TMP(10,2)
@@ -482,11 +494,6 @@ chacha20_block_xor_mips:
 	xor  X9, T1
 	xor  X10, T2
 	xor  X11, T3
-	STORE_xordata(8)
-	STORE_xordata(9)
-	STORE_xordata(10)
-	STORE_xordata(11)
-
 	LOAD_data_TMP(12,0)
 	LOAD_data_TMP(13,1)
 	LOAD_data_TMP(14,2)
@@ -495,6 +502,19 @@ chacha20_block_xor_mips:
 	xor  X13, T1
 	xor  X14, T2
 	xor  X15, T3
+
+	STORE_xordata(0)
+	STORE_xordata(1)
+	STORE_xordata(2)
+	STORE_xordata(3)
+	STORE_xordata(4)
+	STORE_xordata(5)
+	STORE_xordata(6)
+	STORE_xordata(7)
+	STORE_xordata(8)
+	STORE_xordata(9)
+	STORE_xordata(10)
+	STORE_xordata(11)
 	STORE_xordata(12)
 	STORE_xordata(13)
 	STORE_xordata(14)
@@ -601,7 +621,7 @@ chacha20_crypt_mips_asm:
 	move	CRYPT_SRC, CRYPT_IN_SRC
 	move	CRYPT_BYTES, CRYPT_IN_BYTES
 
-	li	CRYPT_LAST_BLOCK, CHACHA20_BLOCK_SIZE
+	sltiu	CRYPT_LAST_BLOCK, CRYPT_IN_BYTES, CHACHA20_BLOCK_SIZE
 
 	// skip memorycopy if DST=SRC
 	beq	CRYPT_IN_DST, CRYPT_IN_SRC, .Lcrypt_loop_skip_memcpy
@@ -617,23 +637,24 @@ chacha20_crypt_mips_asm:
 
 .Lcrypt_loop_skip_memcpy:
 	// Check bytes less then CHACHA20_BLOCK_SIZE then jump .Lcrypt_nonfull_block
-	blt	CRYPT_BYTES, CRYPT_LAST_BLOCK, .Lcrypt_nonfull_block
+	bnez	CRYPT_LAST_BLOCK, .Lcrypt_nonfull_block
 	nop
 
 .Lcrypt_loop_full_block:
+	// Check Only has 1 full block? then it is the last block
+	sltiu	CRYPT_LAST_BLOCK, CRYPT_BYTES, (CHACHA20_BLOCK_SIZE*2)
 	// Decresse bytes
-	addiu	CRYPT_BYTES, -(CHACHA20_BLOCK_SIZE)
+	addiu	CRYPT_BYTES, -CHACHA20_BLOCK_SIZE
 
-/* 
+	/* Select optimizes version vs generic */
+#if  1
 	// chacha20_block_generic(ctx);
 	// location of buf
 	move	$a0, CRYPT_CTX
 	move	$a1, CRYPT_DST
 	jal	chacha20_block_xor_mips
 	nop
-*/
-
-
+#else
 	// chacha20_block_generic(ctx);
 	// location of buf
 	move	$a0, CRYPT_CTX
@@ -646,14 +667,17 @@ chacha20_crypt_mips_asm:
 	li	$a2, CHACHA20_BLOCK_SIZE
 	jal 	crypto_xor
 	nop
+#endif
+
 
 	// inc DST address for next round.
 	addiu	CRYPT_DST, CHACHA20_BLOCK_SIZE
 
 	// Last Full Block?
-	bge	CRYPT_BYTES, CRYPT_LAST_BLOCK, .Lcrypt_loop_full_block
+	beqz	CRYPT_LAST_BLOCK, .Lcrypt_loop_full_block
 	nop
-// ### END .Lcrypt_loop_full_block:
+
+// ### END .Lcrypt_loop_full_block
 
 	// No bytes left, 
 	beqz	CRYPT_BYTES, .Lcrypt_done
@@ -665,7 +689,9 @@ chacha20_crypt_mips_asm:
 	move	$a0, CRYPT_CTX
 	jal	chacha20_block_mips
 	nop
-/*
+
+	/* Select optimizes version vs generic */
+# if 0
 .Loop_xor_byte:
 	addi	CRYPT_BYTES, -1
 	lbu	$a0, 0(CRYPT_DST)
@@ -676,13 +702,13 @@ chacha20_crypt_mips_asm:
 	addiu	CRYPT_DST, 1
 	bnez	CRYPT_BYTES, .Loop_xor_byte
 	nop
-*/
-
+#else
 	move	$a0, CRYPT_DST
 	addiu	$a1, CRYPT_CTX, CHACHA20_CTX_STREAM_OFFSET
 	move	$a2, CRYPT_BYTES
 	jal 	crypto_xor
 	nop
+#endif
 
 .Lcrypt_done:
 	lw	$ra, PTR_STACK(0)

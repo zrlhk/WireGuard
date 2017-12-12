@@ -91,6 +91,8 @@ asmlinkage void poly1305_init_mips(void *ctx, const u8 key[16]);
 asmlinkage void poly1305_blocks_mips(void *ctx, const u8 *inp, size_t len, u32 padbit);
 asmlinkage void chacha20_block_mips(void *ctx);
 asmlinkage void chacha20_crypt_mips_asm(void *ctx, u8 *dst, const u8 *src, u32 bytes);
+asmlinkage void chacha20_block_xor_mips(void *ctx, u8 *dst);
+
 void __init chacha20poly1305_fpu_init(void) { }
 #else
 void __init chacha20poly1305_fpu_init(void) { }
@@ -271,10 +273,10 @@ no_simd:
 	ctx->state[12] += (bytes + 63) / 64;
 	return;
 #endif
-#if defined(CONFIG_MIPS)
-	//chacha20_crypt_mips_asm(ctx, dst, src, bytes);
+#if defined(CONFIG_MIPS) && defined(CONFIG_32BIT)
+	chacha20_crypt_mips_asm(ctx, dst, src, bytes);
+	return;
 #endif
-	//return;
 
 	if (dst != src)
 		memcpy(dst, src, bytes);
