@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: (GPL-2.0 OR OpenSSL OR CRYPTOGAMS)
+/* SPDX-License-Identifier: GPL-2.0
  *
  * Copyright (C) 2016-2017 René van Dorst <opensource@vdorst.com>. All Rights Reserved.
  */
@@ -10,12 +10,6 @@
 #define POLY1305_CTX_H 0
 #define POLY1305_CTX_R POLY1305_CTX_H + (5*4)
 
-#ifndef CONFIG_32BIT
-#error Only 32-bits
-#endif
-#ifndef CONFIG_CPU_MIPS32_R2
-#error Only MIPS32R2
-#endif
 .text
 #define H0  $t0
 #define H1  $t1

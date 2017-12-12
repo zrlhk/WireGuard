@@ -14,11 +14,11 @@ endif
 ARCH := $(firstword $(subst -, ,$(CBUILD)))
 
 # Set these from the environment to override
-KERNEL_VERSION ?= 4.9.67
+KERNEL_VERSION ?= 4.14.2
 BUILD_PATH ?= $(PWD)/../../../qemu-build/$(ARCH)
 DISTFILES_PATH ?= $(PWD)/distfiles
 DEBUG_KERNEL ?= no
-NR_CPUS ?= 1
+NR_CPUS ?= 4
 
 DOWNLOAD := wget -O
 # DOWNLOAD := curl -f -o
