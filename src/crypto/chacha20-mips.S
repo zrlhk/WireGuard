@@ -280,6 +280,7 @@ chacha20_mips:
 
 .Lchacha20_mips_last_bytes:
 	addiu T3, $sp, TEMP_XOR_OFFSET
+	sltiu	LAST_BLOCK, BYTES, 4
 	// Store block on stack so we can easely access them with a pointer.
 	sw X0,   0(T3)
 	sw X1,   4(T3)
@@ -297,6 +298,27 @@ chacha20_mips:
 	sw X13, 52(T3)
 	sw X14, 56(T3)
 	sw X15, 60(T3)
+
+	bnez	LAST_BLOCK, .Loop_xor_byte
+	nop
+
+.Loop_xor_word:
+	addiu	BYTES, -4
+	lw	T0, 0(IN)
+	addiu	IN, 4
+	lw	T1, 0(T3)
+	sltiu	LAST_BLOCK, BYTES, 4
+	addiu	T3, 4
+	xor	T0, T1
+	sw	T0, 0(OUT)
+	addiu	OUT, 4
+	.set noreorder
+	beqz	LAST_BLOCK, .Loop_xor_word
+	nop
+	.set reorder
+
+	beqz	BYTES, .Lchacha20_mips_done
+	nop
 
 .Loop_xor_byte:
 	addiu	BYTES, -1
