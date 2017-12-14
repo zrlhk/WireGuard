@@ -45,7 +45,7 @@
 	rotl X(Z), S;
 
 #define CHACHA20_BLOCK_SIZE 64
-#define STACK_SIZE	96
+#define STACK_SIZE	104
 #define OUT		$a0
 #define IN		$a1
 #define BYTES		$a2
