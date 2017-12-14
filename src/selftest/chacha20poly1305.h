@@ -294,6 +294,98 @@ bool __init chacha20poly1305_selftest(void)
 	u8 computed_result[3000];
 	bool success = true, ret;
 
+
+#if 1
+	pr_info("Start chacha20 benchmark: ");
+
+	struct chacha20_ctx chacha20_state = chacha20_initial_state(chacha20poly1305_enc_vectors[0].key, (u8 *)&chacha20poly1305_enc_vectors->nonce);
+	
+	u8 block0[1440] = { 0 };
+
+	cycles_t start, end;
+	enum { runs = 512 };
+
+	msleep(3000);
+
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, sizeof(block0), false);
+
+	/* 1 block only */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, 1, false);
+	end = get_cycles();
+
+	pr_info("chacha20_crypt: 1 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
+
+	/* 1 block only */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, 4, false);
+	end = get_cycles();
+
+	pr_err("chacha20_crypt: 4 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
+
+	/* 1 block only */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, 5, false);
+	end = get_cycles();
+
+	pr_err("chacha20_crypt: 5 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
+
+	/* 1 block only */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, CHACHA20_BLOCK_SIZE, false);
+	end = get_cycles();
+
+	pr_info("chacha20_crypt: 64 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
+
+	/* 1 block only */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, 63, false);
+	end = get_cycles();
+
+	pr_err("chacha20_crypt: 63 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
+
+
+	/* 1 block only */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, 127, false);
+	end = get_cycles();
+
+	pr_err("chacha20_crypt: 127 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
+
+	/* 1 block only */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, 191, false);
+	end = get_cycles();
+
+	pr_err("chacha20_crypt: 191 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
+
+
+	/* 22 block only, ~1408 mtu */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, 1408, false);
+	end = get_cycles();
+
+	pr_info("chacha20_crypt: 1408 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
+
+	/* 22.5 block only, ~1440 mtu */
+	start = get_cycles();
+	for (i = 0; i < runs; ++i)
+		chacha20_crypt(&chacha20_state, block0, block0, sizeof(block0), false);
+	end = get_cycles();
+
+	pr_info("chacha20_crypt: 1440 bytes: %8x, %8x, %u cycles per block\n", end, start, (end - start) / runs);
+
+#endif
+
 	for (i = 0; i < ARRAY_SIZE(chacha20poly1305_enc_vectors); ++i) {
 		memset(computed_result, 0, sizeof(computed_result));
 		chacha20poly1305_encrypt(computed_result, chacha20poly1305_enc_vectors[i].input, chacha20poly1305_enc_vectors[i].ilen, chacha20poly1305_enc_vectors[i].assoc, chacha20poly1305_enc_vectors[i].alen, le64_to_cpu(*(__force __le64 *)chacha20poly1305_enc_vectors[i].nonce), chacha20poly1305_enc_vectors[i].key);
