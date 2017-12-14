@@ -65,7 +65,6 @@
 
 #define TEMP_XOR_OFFSET 40
 
-// chacha20_mips(u8 *out, const u8 *in, size_t len, const u32 key[8], const u32 counter[4]);
 .align 4
 .set reorder
 .set noat
@@ -77,9 +76,10 @@ chacha20_mips:
 
 	addiu $sp, -(STACK_SIZE)
 
-	// Return if no bytes
+	.set noreorder
 	beqz BYTES, .Lchacha20_mips_end
 	nop
+	.set reorder
 
 	sw $ra,  0($sp)
 	sw $fp,  4($sp)
@@ -129,7 +129,7 @@ chacha20_mips:
 
 	.set noreorder
 	bnez ROUND_INDEX, .Loop_chacha_xor_rounds
-	subu ROUND_INDEX, 1
+	addiu ROUND_INDEX, -1
 	.set reorder
 
 	lui T0, U32_HI_PART(CONSTANT_1)
@@ -207,9 +207,10 @@ chacha20_mips:
 	rotr 	X15, 16
 #endif
 
-	// XOR last bytes
+	.set noreorder
 	bnez LAST_BLOCK, .Lchacha20_mips_last_bytes
 	nop
+	.set reorder
 
 	lw T0, 0(IN)
 	lw T1, 4(IN)
@@ -266,18 +267,16 @@ chacha20_mips:
 	sw X14, 56(OUT)
 	sw X15, 60(OUT)
 
-	// update pointers
 	addiu IN,  CHACHA20_BLOCK_SIZE
 	addiu OUT, CHACHA20_BLOCK_SIZE
 
 .set noreorder
-	// bytes left?
 	bnez BYTES, .Loop_chacha
 	addiu COUNTER_0, 1
-.set reorder
 
 	b .Lchacha20_mips_done
 	nop
+.set reorder
 
 .Lchacha20_mips_last_bytes:
 	addiu T3, $sp, TEMP_XOR_OFFSET
