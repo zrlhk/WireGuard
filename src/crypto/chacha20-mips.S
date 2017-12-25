@@ -8,13 +8,14 @@
 .align 4
 jmp_table: .word .Lchacha20_mips_xor_64b,.Lchacha20_mips_xor_1b,.Lchacha20_mips_xor_2b,.Lchacha20_mips_xor_3b,.Lchacha20_mips_xor_4b,.Lchacha20_mips_xor_5b,.Lchacha20_mips_xor_6b,.Lchacha20_mips_xor_7b,.Lchacha20_mips_xor_8b,.Lchacha20_mips_xor_9b,.Lchacha20_mips_xor_10b,.Lchacha20_mips_xor_11b,.Lchacha20_mips_xor_12b,.Lchacha20_mips_xor_13b,.Lchacha20_mips_xor_14b,.Lchacha20_mips_xor_15b,.Lchacha20_mips_xor_16b,.Lchacha20_mips_xor_17b,.Lchacha20_mips_xor_18b,.Lchacha20_mips_xor_19b,.Lchacha20_mips_xor_20b,.Lchacha20_mips_xor_21b,.Lchacha20_mips_xor_22b,.Lchacha20_mips_xor_23b,.Lchacha20_mips_xor_24b,.Lchacha20_mips_xor_25b,.Lchacha20_mips_xor_26b,.Lchacha20_mips_xor_27b,.Lchacha20_mips_xor_28b,.Lchacha20_mips_xor_29b,.Lchacha20_mips_xor_30b,.Lchacha20_mips_xor_31b,.Lchacha20_mips_xor_32b,.Lchacha20_mips_xor_33b,.Lchacha20_mips_xor_34b,.Lchacha20_mips_xor_35b,.Lchacha20_mips_xor_36b,.Lchacha20_mips_xor_37b,.Lchacha20_mips_xor_38b,.Lchacha20_mips_xor_39b,.Lchacha20_mips_xor_40b,.Lchacha20_mips_xor_41b,.Lchacha20_mips_xor_42b,.Lchacha20_mips_xor_43b,.Lchacha20_mips_xor_44b,.Lchacha20_mips_xor_45b,.Lchacha20_mips_xor_46b,.Lchacha20_mips_xor_47b,.Lchacha20_mips_xor_48b,.Lchacha20_mips_xor_49b,.Lchacha20_mips_xor_50b,.Lchacha20_mips_xor_51b,.Lchacha20_mips_xor_52b,.Lchacha20_mips_xor_53b,.Lchacha20_mips_xor_54b,.Lchacha20_mips_xor_55b,.Lchacha20_mips_xor_56b,.Lchacha20_mips_xor_57b,.Lchacha20_mips_xor_58b,.Lchacha20_mips_xor_59b,.Lchacha20_mips_xor_60b,.Lchacha20_mips_xor_61b,.Lchacha20_mips_xor_62b,.Lchacha20_mips_xor_63b
 
-#ifdef __MIPSEB__
-#define MSB 0
-#define LSB 3
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define SH  swl
+#define SR  8
+#define ROTR(n) rotr n, 24
 #else
-#define MSB 3
-#define LSB 0
-#error "MIPS EL"
+#define SH  sh
+#define SR  16
+#define ROTR(n)
 #endif
 
 #define X0  $v0
@@ -310,8 +311,8 @@ chacha20_mips:
 	sw X12,48(OUT)
 	sw X13,52(OUT)
 	sw X14,56(OUT)
-	srl T5, X15, 8
-	swl X15,60(OUT)
+	srl T5, X15, SR
+	SH X15,60(OUT)
 	sb T5,62(OUT)
 
 	b .Lchacha20_mips_xor_48b
@@ -329,7 +330,7 @@ chacha20_mips:
 	sw X12,48(OUT)
 	sw X13,52(OUT)
 	sw X14,56(OUT)
-	swl X15,60(OUT)
+	SH X15,60(OUT)
 
 	b .Lchacha20_mips_xor_48b
 	nop
@@ -346,7 +347,7 @@ chacha20_mips:
 	sw X12,48(OUT)
 	sw X13,52(OUT)
 	sw X14,56(OUT)
-	rotr X15,24
+	ROTR(X15)
 	sb X15,60(OUT)
 
 	b .Lchacha20_mips_xor_48b
@@ -375,8 +376,8 @@ chacha20_mips:
 	xor X14,T2
 	sw X12,48(OUT)
 	sw X13,52(OUT)
-	srl T5, X14, 8
-	swl X14,56(OUT)
+	srl T5, X14, SR
+	SH X14,56(OUT)
 	sb T5,58(OUT)
 
 	b .Lchacha20_mips_xor_48b
@@ -391,7 +392,7 @@ chacha20_mips:
 	xor X14,T2
 	sw X12,48(OUT)
 	sw X13,52(OUT)
-	swl X14,56(OUT)
+	SH X14,56(OUT)
 
 	b .Lchacha20_mips_xor_48b
 	nop
@@ -405,7 +406,7 @@ chacha20_mips:
 	xor X14,T2
 	sw X12,48(OUT)
 	sw X13,52(OUT)
-	rotr X14,24
+	ROTR(X14)
 	sb X14,56(OUT)
 
 	b .Lchacha20_mips_xor_48b
@@ -428,8 +429,8 @@ chacha20_mips:
 	xor X12,T0
 	xor X13,T1
 	sw X12,48(OUT)
-	srl T5, X13, 8
-	swl X13,52(OUT)
+	srl T5, X13, SR
+	SH X13,52(OUT)
 	sb T5,54(OUT)
 
 	b .Lchacha20_mips_xor_48b
@@ -441,7 +442,7 @@ chacha20_mips:
 	xor X12,T0
 	xor X13,T1
 	sw X12,48(OUT)
-	swl X13,52(OUT)
+	SH X13,52(OUT)
 
 	b .Lchacha20_mips_xor_48b
 	nop
@@ -452,7 +453,7 @@ chacha20_mips:
 	xor X12,T0
 	xor X13,T1
 	sw X12,48(OUT)
-	rotr X13,24
+	ROTR(X13)
 	sb X13,52(OUT)
 
 	b .Lchacha20_mips_xor_48b
@@ -469,8 +470,8 @@ chacha20_mips:
 .Lchacha20_mips_xor_51b:
 	lw T0,48(IN)
 	xor X12,T0
-	srl T5, X12, 8
-	swl X12,48(OUT)
+	srl T5, X12, SR
+	SH X12,48(OUT)
 	sb T5,50(OUT)
 
 	b .Lchacha20_mips_xor_48b
@@ -479,7 +480,7 @@ chacha20_mips:
 .Lchacha20_mips_xor_50b:
 	lw T0,48(IN)
 	xor X12,T0
-	swl X12,48(OUT)
+	SH X12,48(OUT)
 
 	b .Lchacha20_mips_xor_48b
 	nop
@@ -487,7 +488,7 @@ chacha20_mips:
 .Lchacha20_mips_xor_49b:
 	lw T0,48(IN)
 	xor X12,T0
-	rotr X12,24
+	ROTR(X12)
 	sb X12,48(OUT)
 
 .Lchacha20_mips_xor_48b:
@@ -519,8 +520,8 @@ chacha20_mips:
 	sw X8,32(OUT)
 	sw X9,36(OUT)
 	sw X10,40(OUT)
-	srl T5, X11, 8
-	swl X11,44(OUT)
+	srl T5, X11, SR
+	SH X11,44(OUT)
 	sb T5,46(OUT)
 
 	b .Lchacha20_mips_xor_32b
@@ -538,7 +539,7 @@ chacha20_mips:
 	sw X8,32(OUT)
 	sw X9,36(OUT)
 	sw X10,40(OUT)
-	swl X11,44(OUT)
+	SH X11,44(OUT)
 
 	b .Lchacha20_mips_xor_32b
 	nop
@@ -555,7 +556,7 @@ chacha20_mips:
 	sw X8,32(OUT)
 	sw X9,36(OUT)
 	sw X10,40(OUT)
-	rotr X11,24
+	ROTR(X11)
 	sb X11,44(OUT)
 
 	b .Lchacha20_mips_xor_32b
@@ -584,8 +585,8 @@ chacha20_mips:
 	xor X10,T2
 	sw X8,32(OUT)
 	sw X9,36(OUT)
-	srl T5, X10, 8
-	swl X10,40(OUT)
+	srl T5, X10, SR
+	SH X10,40(OUT)
 	sb T5,42(OUT)
 
 	b .Lchacha20_mips_xor_32b
@@ -600,7 +601,7 @@ chacha20_mips:
 	xor X10,T2
 	sw X8,32(OUT)
 	sw X9,36(OUT)
-	swl X10,40(OUT)
+	SH X10,40(OUT)
 
 	b .Lchacha20_mips_xor_32b
 	nop
@@ -614,7 +615,7 @@ chacha20_mips:
 	xor X10,T2
 	sw X8,32(OUT)
 	sw X9,36(OUT)
-	rotr X10,24
+	ROTR(X10)
 	sb X10,40(OUT)
 
 	b .Lchacha20_mips_xor_32b
@@ -637,8 +638,8 @@ chacha20_mips:
 	xor X8,T0
 	xor X9,T1
 	sw X8,32(OUT)
-	srl T5, X9, 8
-	swl X9,36(OUT)
+	srl T5, X9, SR
+	SH X9,36(OUT)
 	sb T5,38(OUT)
 
 	b .Lchacha20_mips_xor_32b
@@ -650,7 +651,7 @@ chacha20_mips:
 	xor X8,T0
 	xor X9,T1
 	sw X8,32(OUT)
-	swl X9,36(OUT)
+	SH X9,36(OUT)
 
 	b .Lchacha20_mips_xor_32b
 	nop
@@ -661,7 +662,7 @@ chacha20_mips:
 	xor X8,T0
 	xor X9,T1
 	sw X8,32(OUT)
-	rotr X9,24
+	ROTR(X9)
 	sb X9,36(OUT)
 
 	b .Lchacha20_mips_xor_32b
@@ -678,8 +679,8 @@ chacha20_mips:
 .Lchacha20_mips_xor_35b:
 	lw T0,32(IN)
 	xor X8,T0
-	srl T5, X8, 8
-	swl X8,32(OUT)
+	srl T5, X8, SR
+	SH X8,32(OUT)
 	sb T5,34(OUT)
 
 	b .Lchacha20_mips_xor_32b
@@ -688,7 +689,7 @@ chacha20_mips:
 .Lchacha20_mips_xor_34b:
 	lw T0,32(IN)
 	xor X8,T0
-	swl X8,32(OUT)
+	SH X8,32(OUT)
 
 	b .Lchacha20_mips_xor_32b
 	nop
@@ -696,7 +697,7 @@ chacha20_mips:
 .Lchacha20_mips_xor_33b:
 	lw T0,32(IN)
 	xor X8,T0
-	rotr X8,24
+	ROTR(X8)
 	sb X8,32(OUT)
 
 .Lchacha20_mips_xor_32b:
@@ -728,8 +729,8 @@ chacha20_mips:
 	sw X4,16(OUT)
 	sw X5,20(OUT)
 	sw X6,24(OUT)
-	srl T5, X7, 8
-	swl X7,28(OUT)
+	srl T5, X7, SR
+	SH X7,28(OUT)
 	sb T5,30(OUT)
 
 	b .Lchacha20_mips_xor_16b
@@ -747,7 +748,7 @@ chacha20_mips:
 	sw X4,16(OUT)
 	sw X5,20(OUT)
 	sw X6,24(OUT)
-	swl X7,28(OUT)
+	SH X7,28(OUT)
 
 	b .Lchacha20_mips_xor_16b
 	nop
@@ -764,7 +765,7 @@ chacha20_mips:
 	sw X4,16(OUT)
 	sw X5,20(OUT)
 	sw X6,24(OUT)
-	rotr X7,24
+	ROTR(X7)
 	sb X7,28(OUT)
 
 	b .Lchacha20_mips_xor_16b
@@ -793,8 +794,8 @@ chacha20_mips:
 	xor X6,T2
 	sw X4,16(OUT)
 	sw X5,20(OUT)
-	srl T5, X6, 8
-	swl X6,24(OUT)
+	srl T5, X6, SR
+	SH X6,24(OUT)
 	sb T5,26(OUT)
 
 	b .Lchacha20_mips_xor_16b
@@ -809,7 +810,7 @@ chacha20_mips:
 	xor X6,T2
 	sw X4,16(OUT)
 	sw X5,20(OUT)
-	swl X6,24(OUT)
+	SH X6,24(OUT)
 
 	b .Lchacha20_mips_xor_16b
 	nop
@@ -823,7 +824,7 @@ chacha20_mips:
 	xor X6,T2
 	sw X4,16(OUT)
 	sw X5,20(OUT)
-	rotr X6,24
+	ROTR(X6)
 	sb X6,24(OUT)
 
 	b .Lchacha20_mips_xor_16b
@@ -846,8 +847,8 @@ chacha20_mips:
 	xor X4,T0
 	xor X5,T1
 	sw X4,16(OUT)
-	srl T5, X5, 8
-	swl X5,20(OUT)
+	srl T5, X5, SR
+	SH X5,20(OUT)
 	sb T5,22(OUT)
 
 	b .Lchacha20_mips_xor_16b
@@ -859,7 +860,7 @@ chacha20_mips:
 	xor X4,T0
 	xor X5,T1
 	sw X4,16(OUT)
-	swl X5,20(OUT)
+	SH X5,20(OUT)
 
 	b .Lchacha20_mips_xor_16b
 	nop
@@ -870,7 +871,7 @@ chacha20_mips:
 	xor X4,T0
 	xor X5,T1
 	sw X4,16(OUT)
-	rotr X5,24
+	ROTR(X5)
 	sb X5,20(OUT)
 
 	b .Lchacha20_mips_xor_16b
@@ -887,8 +888,8 @@ chacha20_mips:
 .Lchacha20_mips_xor_19b:
 	lw T0,16(IN)
 	xor X4,T0
-	srl T5, X4, 8
-	swl X4,16(OUT)
+	srl T5, X4, SR
+	SH X4,16(OUT)
 	sb T5,18(OUT)
 
 	b .Lchacha20_mips_xor_16b
@@ -897,7 +898,7 @@ chacha20_mips:
 .Lchacha20_mips_xor_18b:
 	lw T0,16(IN)
 	xor X4,T0
-	swl X4,16(OUT)
+	SH X4,16(OUT)
 
 	b .Lchacha20_mips_xor_16b
 	nop
@@ -905,7 +906,7 @@ chacha20_mips:
 .Lchacha20_mips_xor_17b:
 	lw T0,16(IN)
 	xor X4,T0
-	rotr X4,24
+	ROTR(X4)
 	sb X4,16(OUT)
 
 .Lchacha20_mips_xor_16b:
@@ -937,8 +938,8 @@ chacha20_mips:
 	sw X0, 0(OUT)
 	sw X1, 4(OUT)
 	sw X2, 8(OUT)
-	srl T5, X3, 8
-	swl X3,12(OUT)
+	srl T5, X3, SR
+	SH X3,12(OUT)
 	sb T5,14(OUT)
 
 	b .Lchacha20_mips_done
@@ -956,7 +957,7 @@ chacha20_mips:
 	sw X0, 0(OUT)
 	sw X1, 4(OUT)
 	sw X2, 8(OUT)
-	swl X3,12(OUT)
+	SH X3,12(OUT)
 
 	b .Lchacha20_mips_done
 	nop
@@ -973,7 +974,7 @@ chacha20_mips:
 	sw X0, 0(OUT)
 	sw X1, 4(OUT)
 	sw X2, 8(OUT)
-	rotr X3,24
+	ROTR(X3)
 	sb X3,12(OUT)
 
 	b .Lchacha20_mips_done
@@ -1002,8 +1003,8 @@ chacha20_mips:
 	xor X2,T2
 	sw X0, 0(OUT)
 	sw X1, 4(OUT)
-	srl T5, X2, 8
-	swl X2, 8(OUT)
+	srl T5, X2, SR
+	SH X2, 8(OUT)
 	sb T5,10(OUT)
 
 	b .Lchacha20_mips_done
@@ -1018,7 +1019,7 @@ chacha20_mips:
 	xor X2,T2
 	sw X0, 0(OUT)
 	sw X1, 4(OUT)
-	swl X2, 8(OUT)
+	SH X2, 8(OUT)
 
 	b .Lchacha20_mips_done
 	nop
@@ -1032,7 +1033,7 @@ chacha20_mips:
 	xor X2,T2
 	sw X0, 0(OUT)
 	sw X1, 4(OUT)
-	rotr X2,24
+	ROTR(X2)
 	sb X2, 8(OUT)
 
 	b .Lchacha20_mips_done
@@ -1055,8 +1056,8 @@ chacha20_mips:
 	xor X0,T0
 	xor X1,T1
 	sw X0, 0(OUT)
-	srl T5, X1, 8
-	swl X1, 4(OUT)
+	srl T5, X1, SR
+	SH X1, 4(OUT)
 	sb T5, 6(OUT)
 
 	b .Lchacha20_mips_done
@@ -1068,7 +1069,7 @@ chacha20_mips:
 	xor X0,T0
 	xor X1,T1
 	sw X0, 0(OUT)
-	swl X1, 4(OUT)
+	SH X1, 4(OUT)
 
 	b .Lchacha20_mips_done
 	nop
@@ -1079,7 +1080,7 @@ chacha20_mips:
 	xor X0,T0
 	xor X1,T1
 	sw X0, 0(OUT)
-	rotr X1,24
+	ROTR(X1)
 	sb X1, 4(OUT)
 
 	b .Lchacha20_mips_done
@@ -1096,8 +1097,8 @@ chacha20_mips:
 .Lchacha20_mips_xor_3b:
 	lw T0, 0(IN)
 	xor X0,T0
-	srl T5, X0, 8
-	swl X0, 0(OUT)
+	rotr T5, X0, SR
+	SH X0, 0(OUT)
 	sb T5, 2(OUT)
 
 	b .Lchacha20_mips_done
@@ -1106,7 +1107,7 @@ chacha20_mips:
 .Lchacha20_mips_xor_2b:
 	lw T0, 0(IN)
 	xor X0,T0
-	swl X0, 0(OUT)
+	SH X0, 0(OUT)
 
 	b .Lchacha20_mips_done
 	nop
@@ -1114,7 +1115,7 @@ chacha20_mips:
 .Lchacha20_mips_xor_1b:
 	lw T0, 0(IN)
 	xor X0,T0
-	rotr X0,24
+	ROTR(X0)
 	sb X0, 0(OUT)
 
 
