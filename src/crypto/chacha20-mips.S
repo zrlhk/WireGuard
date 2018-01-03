@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0
  *
- * Copyright (C) 2016-2017 René van Dorst <opensource@vdorst.com>. All Rights Reserved.
+ * Copyright (C) 2016-2018 René van Dorst <opensource@vdorst.com>. All Rights Reserved.
  * Copyright (C) 2015-2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  */
 
@@ -74,9 +74,6 @@ jmp_table: .word .Lchacha20_mips_xor_64b,.Lchacha20_mips_xor_1b,.Lchacha20_mips_
 #define CONSTANT_3	0x79622d32
 #define CONSTANT_4	0x6b206574
 
-#define U32_HI_PART(x)	((x & 0xFFFF0000) >> 16)
-#define U32_LO_PART(x)	(x & 0x0000FFFF)
-
 #define TEMP_XOR_OFFSET 40
 
 .text
@@ -110,14 +107,14 @@ chacha20_mips:
 	lw COUNTER_0, 0(COUNTER)
 
 .Loop_chacha:
-	lui X0, U32_HI_PART(CONSTANT_1)
-	lui X1, U32_HI_PART(CONSTANT_2)
-	lui X2, U32_HI_PART(CONSTANT_3)
-	lui X3, U32_HI_PART(CONSTANT_4)
-	ori X0, U32_LO_PART(CONSTANT_1)
-	ori X1, U32_LO_PART(CONSTANT_2)
-	ori X2, U32_LO_PART(CONSTANT_3)
-	ori X3, U32_LO_PART(CONSTANT_4)
+	lui X0, %hi(CONSTANT_1)
+	lui X1, %hi(CONSTANT_2)
+	lui X2, %hi(CONSTANT_3)
+	lui X3, %hi(CONSTANT_4)
+	ori X0, %lo(CONSTANT_1)
+	ori X1, %lo(CONSTANT_2)
+	ori X2, %lo(CONSTANT_3)
+	ori X3, %lo(CONSTANT_4)
 	lw X4,   0(KEY)
 	lw X5,   4(KEY)
 	lw X6,   8(KEY)
@@ -147,14 +144,14 @@ chacha20_mips:
 	subu ROUND_INDEX, 1
 	.set reorder
 
-	lui T0, U32_HI_PART(CONSTANT_1)
-	lui T1, U32_HI_PART(CONSTANT_2)
-	lui T2, U32_HI_PART(CONSTANT_3)
-	lui T3, U32_HI_PART(CONSTANT_4)
-	ori T0, U32_LO_PART(CONSTANT_1)
-	ori T1, U32_LO_PART(CONSTANT_2)
-	ori T2, U32_LO_PART(CONSTANT_3)
-	ori T3, U32_LO_PART(CONSTANT_4)
+	lui T0, %hi(CONSTANT_1)
+	lui T1, %hi(CONSTANT_2)
+	lui T2, %hi(CONSTANT_3)
+	lui T3, %hi(CONSTANT_4)
+	ori T0, %lo(CONSTANT_1)
+	ori T1, %lo(CONSTANT_2)
+	ori T2, %lo(CONSTANT_3)
+	ori T3, %lo(CONSTANT_4)
 	addu X0, T0
 	addu X1, T1
 	addu X2, T2
