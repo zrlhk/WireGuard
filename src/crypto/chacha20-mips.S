@@ -90,8 +90,10 @@ chacha20_mips:
 	addiu $sp, -(STACK_SIZE)
 
 	// Return if no bytes
+	.set noreorder
 	beqz BYTES, .Lchacha20_mips_end
 	nop
+	.set reorder
 
 	sw $ra,  0($sp)
 	sw $fp,  4($sp)
@@ -172,6 +174,7 @@ chacha20_mips:
 	addu X9, T1
 	addu X10, T2
 	addu X11, T3
+	sltiu	T0, BYTES, CHACHA20_BLOCK_SIZE
 	lw T1, 4(COUNTER)
 	lw T2, 8(COUNTER)
 	lw T3, 12(COUNTER)
@@ -214,17 +217,18 @@ chacha20_mips:
 	rotr 	X14, 16
 	rotr 	X15, 16
 #endif
-	sltiu	T2, BYTES, CHACHA20_BLOCK_SIZE
-	beqz	T2, .Lchacha20_mips_xor_64b
-	nop
 
-	andi T1, BYTES, (CHACHA20_BLOCK_SIZE-1)
-	la   T0, jmp_table
-	sll  T1, 2
-	addu  T0, T1
-	lw T0, (T0)
-	nop
-	jr T0
+	.set noreorder
+	beqz	T0, .Lchacha20_mips_xor_64b
+	addiu BYTES, -(CHACHA20_BLOCK_SIZE)
+	.set reorder
+
+	//T0 = ADDRESS(jmp_table) + ((bytes & (CHACHA20_BLOCK_SIZE-1)) << 2)
+	lui     T0, %hi(jmp_table)
+	ins     T0, BYTES, 2, 6
+	addiu   T0, %lo(jmp_table)
+	lw      T0, 0(T0)
+	jr      T0
 	nop
 
 .Lchacha20_mips_xor_64b:
@@ -236,6 +240,10 @@ chacha20_mips:
 	xor X1, T1
 	xor X2, T2
 	xor X3, T3
+	sw X0,   0(OUT)
+	sw X1,   4(OUT)
+	sw X2,   8(OUT)
+	sw X3,  12(OUT)
 
 	lw T0, 16(IN)
 	lw T1, 20(IN)
@@ -245,6 +253,10 @@ chacha20_mips:
 	xor X5, T1
 	xor X6, T2
 	xor X7, T3
+	sw X4,  16(OUT)
+	sw X5,  20(OUT)
+	sw X6,  24(OUT)
+	sw X7,  28(OUT)
 
 	lw T0, 32(IN)
 	lw T1, 36(IN)
@@ -254,6 +266,10 @@ chacha20_mips:
 	xor X9, T1
 	xor X10, T2
 	xor X11, T3
+	sw X8,  32(OUT)
+	sw X9,  36(OUT)
+	sw X10, 40(OUT)
+	sw X11, 44(OUT)
 
 	lw T0, 48(IN)
 	lw T1, 52(IN)
@@ -263,21 +279,6 @@ chacha20_mips:
 	xor X13, T1
 	xor X14, T2
 	xor X15, T3
-
-	addiu BYTES, -(CHACHA20_BLOCK_SIZE)
-
-	sw X0,   0(OUT)
-	sw X1,   4(OUT)
-	sw X2,   8(OUT)
-	sw X3,  12(OUT)
-	sw X4,  16(OUT)
-	sw X5,  20(OUT)
-	sw X6,  24(OUT)
-	sw X7,  28(OUT)
-	sw X8,  32(OUT)
-	sw X9,  36(OUT)
-	sw X10, 40(OUT)
-	sw X11, 44(OUT)
 	sw X12, 48(OUT)
 	sw X13, 52(OUT)
 	sw X14, 56(OUT)
@@ -1114,8 +1115,6 @@ chacha20_mips:
 	xor X0,T0
 	ROTR(X0)
 	sb X0, 0(OUT)
-
-
 
 .Lchacha20_mips_done:
 	lw $ra,  0($sp)
