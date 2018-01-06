@@ -3,12 +3,11 @@
  * Copyright (C) 2016-2017 René van Dorst <opensource@vdorst.com>. All Rights Reserved.
  */
 
-
 #include <linux/linkage.h>
-
 
 #define POLY1305_CTX_H 0
 #define POLY1305_CTX_R POLY1305_CTX_H + (5*4)
+#define POLY1305_BLOCK_SIZE 16
 
 .text
 #define H0  $t0
@@ -159,7 +158,6 @@ poly1305_loop:
 	rotr 	I(3), 16
 #endif
 
-
 	addiu src, POLY1305_BLOCK_SIZE
 	addiu srclen, -POLY1305_BLOCK_SIZE
 	
@@ -291,65 +289,53 @@ poly1305_loop_finish:
 #define PR1 $t5
 #define PR2 $t6
 #define PR3 $t7
-
 #define PT0 $t0
 
-#define PR(n)  PR ## n
-#define PT(n)  PT ## n
-
-#define STORE_zero_poly_h(n) 	sw $zero, PTR_POLY1305_H(n);
-#define STORE_poly_r(n)		sw PR(n), PTR_POLY1305_R(n);
 #define LOAD_key(RG,n)		lw RG, (n * 4) ## ($a1);
 
-
-// static void poly1305_init(struct poly1305_ctx *ctx, const u8 key[static POLY1305_KEY_SIZE])
 // asmlinkage void poly1305_init_mips(void *ctx, const u8 key[16]);
-.set noreorder
 .globl poly1305_init_mips
 .ent poly1305_init_mips
 poly1305_init_mips:
+	LOAD_key(PR0, 0)
+	LOAD_key(PR1, 1)
+	LOAD_key(PR2, 2)
+	LOAD_key(PR3, 3)
 
-	lui 	PT(0), 0x0FFF
-	
-	LOAD_key(PR(0), 0)
-	LOAD_key(PR(1), 1)
-	LOAD_key(PR(2), 2)
-	LOAD_key(PR(3), 3)
-
-	ori	PT(0), 0xFFFC
+	lui PT0, 0x0FFF
 
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-	wsbh 	PR(0)
-	wsbh 	PR(1)
-	wsbh 	PR(2)
-	wsbh 	PR(3)
-	rotr 	PR(0), 16
-	rotr 	PR(1), 16
-	rotr 	PR(2), 16
-	rotr 	PR(3), 16
+	wsbh PR0
+	wsbh PR1
+	wsbh PR2
+	wsbh PR3
+	rotr PR0, 16
+	rotr PR1, 16
+	rotr PR2, 16
+	rotr PR3, 16
 #endif
 
+	sw $zero, PTR_POLY1305_H(0)
+	sw $zero, PTR_POLY1305_H(1)
+	sw $zero, PTR_POLY1305_H(2)
+	ori PT0, 0xFFFC
+	sw $zero, PTR_POLY1305_H(3)
+	sw $zero, PTR_POLY1305_H(4)
+
 	// AND 0x0fffffff;
-	ext 	PR(0), PR(0), 0, (32-4)
+	ext PR0, PR0, 0, (32-4)
 	// AND 0x0ffffffc;
-	and	PR(1), PR(1), PT(0)
-	and	PR(2), PR(2), PT(0)
-	and	PR(3), PR(3), PT(0)
-	
-	STORE_zero_poly_h(0)
-	STORE_zero_poly_h(1)
-	STORE_zero_poly_h(2)
-	STORE_zero_poly_h(3)
-	STORE_zero_poly_h(4)
-	
-	STORE_poly_r(0)
-	STORE_poly_r(1)
-	STORE_poly_r(2)
-	STORE_poly_r(3)
-	
+	and PR1, PT0
+	and PR2, PT0
+	and PR3, PT0
+
+	sw PR0, PTR_POLY1305_R(0);
+	sw PR1, PTR_POLY1305_R(1);
+	sw PR2, PTR_POLY1305_R(2);
+	sw PR3, PTR_POLY1305_R(3);
+
 	// Jump Back
 	jr	$ra
 	nop
 .end poly1305_init_mips
-.set reorder
 
