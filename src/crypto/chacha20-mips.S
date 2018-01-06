@@ -4,6 +4,9 @@
  * Copyright (C) 2015-2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  */
 
+#include <asm/asm.h>
+#include <asm/prefetch.h>
+
 .data
 .align 4
 jmp_table: .word .Lchacha20_mips_xor_64b,.Lchacha20_mips_xor_1b,.Lchacha20_mips_xor_2b,.Lchacha20_mips_xor_3b,.Lchacha20_mips_xor_4b,.Lchacha20_mips_xor_5b,.Lchacha20_mips_xor_6b,.Lchacha20_mips_xor_7b,.Lchacha20_mips_xor_8b,.Lchacha20_mips_xor_9b,.Lchacha20_mips_xor_10b,.Lchacha20_mips_xor_11b,.Lchacha20_mips_xor_12b,.Lchacha20_mips_xor_13b,.Lchacha20_mips_xor_14b,.Lchacha20_mips_xor_15b,.Lchacha20_mips_xor_16b,.Lchacha20_mips_xor_17b,.Lchacha20_mips_xor_18b,.Lchacha20_mips_xor_19b,.Lchacha20_mips_xor_20b,.Lchacha20_mips_xor_21b,.Lchacha20_mips_xor_22b,.Lchacha20_mips_xor_23b,.Lchacha20_mips_xor_24b,.Lchacha20_mips_xor_25b,.Lchacha20_mips_xor_26b,.Lchacha20_mips_xor_27b,.Lchacha20_mips_xor_28b,.Lchacha20_mips_xor_29b,.Lchacha20_mips_xor_30b,.Lchacha20_mips_xor_31b,.Lchacha20_mips_xor_32b,.Lchacha20_mips_xor_33b,.Lchacha20_mips_xor_34b,.Lchacha20_mips_xor_35b,.Lchacha20_mips_xor_36b,.Lchacha20_mips_xor_37b,.Lchacha20_mips_xor_38b,.Lchacha20_mips_xor_39b,.Lchacha20_mips_xor_40b,.Lchacha20_mips_xor_41b,.Lchacha20_mips_xor_42b,.Lchacha20_mips_xor_43b,.Lchacha20_mips_xor_44b,.Lchacha20_mips_xor_45b,.Lchacha20_mips_xor_46b,.Lchacha20_mips_xor_47b,.Lchacha20_mips_xor_48b,.Lchacha20_mips_xor_49b,.Lchacha20_mips_xor_50b,.Lchacha20_mips_xor_51b,.Lchacha20_mips_xor_52b,.Lchacha20_mips_xor_53b,.Lchacha20_mips_xor_54b,.Lchacha20_mips_xor_55b,.Lchacha20_mips_xor_56b,.Lchacha20_mips_xor_57b,.Lchacha20_mips_xor_58b,.Lchacha20_mips_xor_59b,.Lchacha20_mips_xor_60b,.Lchacha20_mips_xor_61b,.Lchacha20_mips_xor_62b,.Lchacha20_mips_xor_63b
@@ -88,6 +91,18 @@ chacha20_mips:
 	lw COUNTER, 16($sp)
 
 	addiu $sp, -(STACK_SIZE)
+	PREF( Pref_Load, 0(KEY) )
+	PREF( Pref_Load, 32(KEY) )
+	// Prefetch first 256 bytes.
+	PREF( Pref_Load,  0(IN) )
+	PREF( Pref_Load, 32(IN) )
+	PREF( Pref_Load, 64(IN) )
+	PREF( Pref_Load, 96(IN) )
+	PREF( Pref_Load,128(IN) )
+	PREF( Pref_Load,160(IN) )
+	PREF( Pref_Load,192(IN) )
+	PREF( Pref_Load,224(IN) )
+
 
 	// Return if no bytes
 	.set noreorder
@@ -109,22 +124,22 @@ chacha20_mips:
 	lw COUNTER_0, 0(COUNTER)
 
 .Loop_chacha:
-	lui X0, %hi(CONSTANT_1)
-	lui X1, %hi(CONSTANT_2)
-	lui X2, %hi(CONSTANT_3)
-	lui X3, %hi(CONSTANT_4)
-	ori X0, %lo(CONSTANT_1)
-	ori X1, %lo(CONSTANT_2)
-	ori X2, %lo(CONSTANT_3)
-	ori X3, %lo(CONSTANT_4)
 	lw X4,   0(KEY)
 	lw X5,   4(KEY)
 	lw X6,   8(KEY)
 	lw X7,  12(KEY)
+	lui X0, %hi(CONSTANT_1)
+	lui X1, %hi(CONSTANT_2)
+	lui X2, %hi(CONSTANT_3)
+	lui X3, %hi(CONSTANT_4)
 	lw X8,  16(KEY)
 	lw X9,  20(KEY)
 	lw X10, 24(KEY)
 	lw X11, 28(KEY)
+	ori X0, %lo(CONSTANT_1)
+	ori X1, %lo(CONSTANT_2)
+	ori X2, %lo(CONSTANT_3)
+	ori X3, %lo(CONSTANT_4)
 	move X12, COUNTER_0
 	lw X13,  4(COUNTER)
 	lw X14,  8(COUNTER)
@@ -162,6 +177,7 @@ chacha20_mips:
 	lw T1, 4(KEY)
 	lw T2, 8(KEY)
 	lw T3, 12(KEY)
+		lui     T6, %hi(jmp_table)
 	addu X4, T0
 	addu X5, T1
 	addu X6, T2
@@ -170,16 +186,19 @@ chacha20_mips:
 	lw T1, 20(KEY)
 	lw T2, 24(KEY)
 	lw T3, 28(KEY)
+		ins     T6, BYTES, 2, 6
 	addu X8, T0
+	sltiu	T0, BYTES, CHACHA20_BLOCK_SIZE
 	addu X9, T1
 	addu X10, T2
 	addu X11, T3
-	sltiu	T0, BYTES, CHACHA20_BLOCK_SIZE
 	lw T1, 4(COUNTER)
 	lw T2, 8(COUNTER)
 	lw T3, 12(COUNTER)
+		addiu   T6, %lo(jmp_table)
 	addu X12, COUNTER_0
 	addu X13, T1
+		lw      T6, 0(T6)
 	addu X14, T2
 	addu X15, T3
 
@@ -223,15 +242,13 @@ chacha20_mips:
 	addiu BYTES, -(CHACHA20_BLOCK_SIZE)
 	.set reorder
 
-	//T0 = ADDRESS(jmp_table) + ((bytes & (CHACHA20_BLOCK_SIZE-1)) << 2)
-	lui     T0, %hi(jmp_table)
-	ins     T0, BYTES, 2, 6
-	addiu   T0, %lo(jmp_table)
-	lw      T0, 0(T0)
-	jr      T0
+	jr      T6
 	nop
 
 .Lchacha20_mips_xor_64b:
+	PREF( Pref_Load,192(IN) )
+	PREF( Pref_Load,224(IN) )
+
 	lw T0, 0(IN)
 	lw T1, 4(IN)
 	lw T2, 8(IN)
