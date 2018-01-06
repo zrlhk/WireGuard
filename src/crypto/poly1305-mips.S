@@ -10,21 +10,21 @@
 #define POLY1305_BLOCK_SIZE 16
 
 .text
-#define H0  $t0
-#define H1  $t1
-#define H2  $t2
-#define H3  $t3
-#define H4  $t4
+#define H0 $t0
+#define H1 $t1
+#define H2 $t2
+#define H3 $t3
+#define H4 $t4
 
-#define R0  $t5
-#define R1  $t6
-#define R2  $t7
-#define R3  $t8
+#define R0 $t5
+#define R1 $t6
+#define R2 $t7
+#define R3 $t8
 
-#define I0  $t0
-#define I1  $t1
-#define I2  $t2
-#define I3  $t3
+#define I0 $s0
+#define I1 $s4
+#define I2 $s5
+#define I3 $s6
 
 #define O0 $s0
 #define O1 $s4
@@ -34,21 +34,10 @@
 
 #define S1 $s1
 #define S2 $s2
-#define S4 $s3
+#define S3 $s3
 
-#define SC  $gp
-#define CA  $v1
-#define AT  $v1
-
-
-
-
-
-#define R(n)  R ## n
-#define S(n)  H ## n
-#define H(n)  H ## n
-#define O(n)  O ## n
-#define I(n)  I ## n
+#define SC $v1
+#define CA $v0
 
 #define __in_ctx_poly $a0
 #define src        $a1
@@ -58,57 +47,27 @@
 #define PTR_POLY1305_R(n) (POLY1305_CTX_R + (n*4)) ## ($a0)
 #define PTR_POLY1305_H(n) (POLY1305_CTX_H + (n*4)) ## ($a0)
 
-#define LOAD_ctx_r(n)        lw R(n), PTR_POLY1305_R(n);
-#define LOAD_ctx_h(n)        lw H(n), PTR_POLY1305_H(n);
-#define STORE_ctx_h(n)       sw H(n), PTR_POLY1305_H(n);
+#define LOAD_ctx_r(n)        lw R##n, PTR_POLY1305_R(n);
+#define LOAD_ctx_h(n)        lw H##n, PTR_POLY1305_H(n);
+#define STORE_ctx_h(n)       sw H##n, PTR_POLY1305_H(n);
 
 #define POLY1305_BLOCK_SIZE 16
-
-#define GET_HILO_REG(RHI, RLO) \
-	mflo RLO; \
-	mfhi RHI;
-#define AND_3FFFFFF(RT, RS) \
-	ext RT, RS, 0, 26;
-#define poly1305_frame_size 15 * 4
-
-// MULTI_MUL_AND_ADD_PREV( R(2), R(1), R(0), S(4), S(3), H(1))
-#define MULTI_MUL_AND_ADD_PREV( MUL1, MUL2, MUL3, MUL4, MUL5, PREV ) \
-	mflo PREV; \
-	mfhi SC;   \
-	multu O(0), MUL1; \
-	maddu O(1), MUL2; \
-		addu AT,PREV,CA; \
-	maddu O(2), MUL3; \
-	maddu O(3), MUL4; \
-		sltu PREV,AT,PREV; \
-		srl  CA,AT,26; \
-	maddu O(4), MUL5; \
-		addu SC,PREV,SC; \
-		AND_3FFFFFF( PREV, AT ); \
-		ins CA,SC, 32-26, 26
-
-#define ADD_CIO( A, B, C_I, C_O, OUT, SC ) \
-	addu 	SC, A, C_I; \
-	addu	OUT, A, B;  \
-	
-	
-	
+#define POLY1305_STACK_SIZE 8 * 4
 
 // static unsigned int poly1305_blocks_mips   (struct poly1305_ctx *ctx, const u8 *src, unsigned int srclen, u32 hibit)
 // static void         poly1305_blocks_generic(void *ctx, const u8 *inp, size_t len, u32 padbit)
-// .abicalls
-// .text
-.set noat
 .set reorder
-// .set nomips16
-// .set nomicromips
 .globl poly1305_blocks_mips
 .ent poly1305_blocks_mips
 poly1305_blocks_mips:
-	.frame  $sp,poly1305_frame_size,$31
+	.frame  $sp,POLY1305_STACK_SIZE,$31
 	// store the used save registers.
-	addiu 	$sp, -poly1305_frame_size
-	addiu srclen, -POLY1305_BLOCK_SIZE
+	addiu	$sp, -POLY1305_STACK_SIZE
+
+	// return if srclen < POLY1305_BLOCK_SIZE
+	slti	SC, srclen, POLY1305_BLOCK_SIZE
+	bnez	SC, .Lpoly1305_blocks_mips_end
+	nop
 
 	LOAD_ctx_r(0)
 	LOAD_ctx_r(1)
@@ -124,14 +83,6 @@ poly1305_blocks_mips:
 	sw  $s5, 20($sp)
 	sw  $s6, 24($sp)
 	sw  $s7, 28($sp)
-	sw  $gp, 32($sp)
-	
-	srl S(3), R(3),2
-	srl S(2), R(2),2
-	srl S(1), R(1),2
-	addu S(3), R(3)
-	addu S(2), R(2)
-	addu S(1), R(1)
 
 	LOAD_ctx_h(0)
 	LOAD_ctx_h(1)
@@ -139,120 +90,144 @@ poly1305_blocks_mips:
 	LOAD_ctx_h(3)
 	LOAD_ctx_h(4)
 
-poly1305_loop:
+	srl S1, R1, 2
+	srl S2, R2, 2
+	srl S3, R3, 2
+	addu S1, R1
+	addu S2, R2
+	addu S3, R3
 
-	/* h += m[i] */
-	lw I(0), 0(src)
-	lw I(1), 4(src)
-	lw I(2), 8(src)
-	lw I(3),12(src)
+.Lpoly1305_loop:
+	lw I0, 0(src)
+	lw I1, 4(src)
+	lw I2, 8(src)
+	lw I3,12(src)
+
+	addiu SC, $zero, 1
+	addiu src,     POLY1305_BLOCK_SIZE
+	addiu srclen, -POLY1305_BLOCK_SIZE
 
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-	wsbh 	I(0)
-	wsbh 	I(1)
-	wsbh 	I(2)
-	wsbh 	I(3)
-	rotr 	I(0), 16
-	rotr 	I(1), 16
-	rotr 	I(2), 16
-	rotr 	I(3), 16
+	wsbh I0
+	wsbh I1
+	wsbh I2
+	wsbh I3
+	rotr I0, 16
+	rotr I1, 16
+	rotr I2, 16
+	rotr I3, 16
 #endif
 
-	addiu src, POLY1305_BLOCK_SIZE
-	addiu srclen, -POLY1305_BLOCK_SIZE
-	
 	// h0 = (u32)(d0 = (u64)h0 + le32_to_cpuvp(inp + 0));
-	
-	// Add H0 + I0
-	addu O(0), H(0), I(0)
-	sltu CA, O(0), H(0)
-	
+
+	multu H0, SC
+	maddu I0, SC
+	mflo  O0
+	mfhi  CA
+
 	// h1 = (u32)(d1 = (u64)h1 + (d0 >> 32) + le32_to_cpuvp(inp + 4));
-	
-	addu O(1), H(1)
-	addu O(1), CA
+
+	multu H1, SC
+	maddu I1, SC
+	maddu CA, SC
+	mflo  O1
+	mfhi  CA
 
 	// h2 = (u32)(d2 = (u64)h2 + (d1 >> 32) + le32_to_cpuvp(inp + 8));
 
-	sltu O(2), O(1), H(1)
-	addu O(2), H(1)
-	addu O(2), SC
-		
+	multu H2, SC
+	maddu I2, SC
+	maddu CA, SC
+	mflo  O2
+	mfhi  CA
+
 	// h3 = (u32)(d3 = (u64)h3 + (d2 >> 32) + le32_to_cpuvp(inp + 12));
 
-	sltu O(3), O(2), H(2)
-	addu O(3), H(2)
-	addu O(3), SC
+	multu H3, SC
+	maddu I3, SC
+	maddu CA, SC
+	mflo  O3
+	mfhi  CA
 
 	// h4 += (u32)(d3 >> 32) + padbit;
-	
-	sltu O(4), O(3), O(4)
-	addu O(4), H(4)
-	addu O(4), hibit
 
+	addu O4, H4, hibit
+	addu O4, CA
 
 	// D0
-	multu O(0), R(0)
-	maddu O(1), S(3)
-	maddu O(2), S(2)
-	maddu O(3), S(1)
 
-	GET_HILO_REG (H(1), H(0))
+	multu O0, R0
+	maddu O1, S3
+	maddu O2, S2
+	maddu O3, S1
+
+	mflo	H0
+	mfhi	CA
 
 	// D1
-	multu O(4), S(1)
-	mthi  $zero
-	maddu O(0), R(1)
-	maddu O(1), R(0)
-	maddu O(2), S(3)
-	maddu O(3), S(2)
 
-	GET_HILO_REG (H(4), H(0))
-	
+	multu O0, R1
+	maddu O1, R0
+	maddu O2, S3
+	maddu O3, S2
+	maddu O4, S1
+	maddu CA, SC
+
+	mflo	H1
+	mfhi	CA
+
 	// D2
-	
-	multu O(0), R(1)
-	maddu O(1), R(0)
-	maddu O(2), S(3)
-	maddu O(3), S(2)
 
-	GET_HILO_REG (H(2), H(0))
+	multu O0, R2
+	maddu O1, R1
+	maddu O2, R0
+	maddu O3, S3
+	maddu O4, S2
+	maddu CA, SC
 
-	ins CA,SC, 32-26, 26
+	mflo	H2
+	mfhi	CA
 
-	MULTI_MUL_AND_ADD_PREV( R(2), R(1), R(0), S(4), S(3), H(1))
+	// D3
 
-	MULTI_MUL_AND_ADD_PREV( R(3), R(2), R(1), R(0), S(4), H(2))
+	multu O0, R3
+	maddu O1, R2
+	maddu O2, R1
+	maddu O3, R0
+	maddu O4, S3
+	maddu CA, SC
 
-	MULTI_MUL_AND_ADD_PREV( R(1), R(3), R(2), R(1), R(0), H(3))
+	mflo	H3
+	mfhi	CA
 
-	GET_HILO_REG (SC, H(4))
+	// H4
+	mul	H4, O4, R0
+	addu	H4, CA
 
+	// c = (h4 >> 2) + (h4 & ~3U);
+	srl	O0, H4, 2
+	move	CA, H4
+	ins	CA, $zero, 0, 2
+	addu	CA, O0
 
-poly1305_loop_finish:
-	addu AT,H(4),CA
+	andi	H4, 3
 
-	sltu 	H(4),AT,H(4)
-	srl 	CA,AT, 26
-	addu 	SC,H(4),SC
-	AND_3FFFFFF( H(4), AT )
-	ins		CA,SC, 32-26, 26
+	// check length
+	slti	SC, srclen, POLY1305_BLOCK_SIZE
 
-	// Multiply 5
-	// H(0) = H(0) + (CA * 5) = H(0) + CA + (CA << 2)
-	sll   SC, CA, 2
-	addu  H(0), H(0), CA
-	addu  H(0), SC
-
-	// H(1) = H(1) + (H(0) >> 26)
-	srl   SC, H(0), 26
-	addu H(1), SC
-
-	// H(0) = H(0) & 0x3FFFFFF
-	AND_3FFFFFF( H(0), H(0) )
+	// CONSTANT_TIME_CARRY
+	addu	H0, CA
+	sltu	CA, H0, CA
+	addu	H1, CA
+	sltu	CA, H1, CA
+	addu	H2, CA
+	sltu	CA, H2, CA
+	addu	H3, CA
+	sltu	CA, H3, CA
+	addu	H4, CA
 
 	// able to do a 16 byte block.
-	bgezl srclen, poly1305_loop
+	beqz SC, .Lpoly1305_loop
 	nop
 
 	// restore the used save registers.
@@ -264,7 +239,6 @@ poly1305_loop_finish:
 	lw  $s5, 20($sp)
 	lw  $s6, 24($sp)
 	lw  $s7, 28($sp)
-	lw  $gp, 32($sp)
 
 	STORE_ctx_h(0)
 	STORE_ctx_h(1)
@@ -272,18 +246,19 @@ poly1305_loop_finish:
 	STORE_ctx_h(3)
 	STORE_ctx_h(4)
 
-	addiu 	$sp, poly1305_frame_size
+.Lpoly1305_blocks_mips_end:
 	// return remaining bytes
-	addiu	$v0, srclen, POLY1305_BLOCK_SIZE
+	move	$v0, srclen
+
+	.set noreorder
 	// Jump Back
 	jr	$ra
-	nop
+	addiu	$sp, POLY1305_STACK_SIZE
+	.set reorder
 
 .end poly1305_blocks_mips
 .set at
 .set reorder
-
-
 
 #define PR0 $t4
 #define PR1 $t5
@@ -338,4 +313,3 @@ poly1305_init_mips:
 	jr	$ra
 	nop
 .end poly1305_init_mips
-
