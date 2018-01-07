@@ -260,6 +260,97 @@ poly1305_blocks_mips:
 .set at
 .set reorder
 
+#define MAC $a1
+#define NONCE $a2
+
+
+#define G0 $t5
+#define G1 $t6
+#define G2 $t7
+#define G3 $t8
+#define G4 $t9
+
+.set reorder
+.globl poly1305_emit_mips
+.ent poly1305_emit_mips
+poly1305_emit_mips:
+	LOAD_ctx_h(0)
+	LOAD_ctx_h(1)
+	LOAD_ctx_h(2)
+	LOAD_ctx_h(3)
+	LOAD_ctx_h(4)
+
+	/* compare to modulus by computing h + -p */
+	addiu	G0, H0, 5
+	sltu	CA, H0, CA
+	addu	G1, H1, CA
+	sltu	CA, H1, CA
+	addu	G2, H2, CA
+	sltu	CA, H2, CA
+	addu	G3, H3, CA
+	sltu	CA, H3, CA
+	addu	G4, H4, CA
+
+	srl	SC, G4, 2
+
+	/* if there was carry into 131st bit, h3:h0 = g3:g0 */
+	movn	H0, G0, SC
+	movn	H1, G1, SC
+	movn	H2, G2, SC
+	movn	H3, G3, SC
+
+	lw	CA, 0(NONCE)
+	lw	G4, 4(NONCE)
+	lw	G2, 8(NONCE)
+	lw	G3,12(NONCE)
+
+	li	SC,1
+
+	/* mac = (h + nonce) % (2^128) */
+	addu	H0, CA
+	sltu	CA, H0, CA
+
+	//H1
+	multu	H1, SC
+	maddu	G4, SC
+	maddu	CA, SC
+	mfhi	CA
+	mflo	H1
+
+	//H2
+	multu	H2, SC
+	maddu	G1, SC
+	maddu	CA, SC
+	mfhi	CA
+	mflo	H2
+
+	//H3
+	multu	H3, SC
+	maddu	G3, SC
+	maddu	CA, SC
+	mflo	H3
+
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	wsbh H0
+	wsbh H1
+	wsbh H2
+	wsbh H3
+	rotr H0, 16
+	rotr H1, 16
+	rotr H2, 16
+	rotr H3, 16
+#endif
+
+	sw H0, 0(MAC)
+	sw H1, 4(MAC)
+	sw H2, 8(MAC)
+	sw H3,12(MAC)
+
+	jr	$ra
+	nop
+.end poly1305_emit_mips
+
+
 #define PR0 $t4
 #define PR1 $t5
 #define PR2 $t6
