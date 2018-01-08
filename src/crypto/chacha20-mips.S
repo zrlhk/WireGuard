@@ -90,7 +90,9 @@ chacha20_mips:
 	// this is in the fifth argument
 	lw COUNTER, 16($sp)
 
+	slti	T6, BYTES, 256
 	addiu $sp, -(STACK_SIZE)
+	bnez	T6, .Lchacha20_mips_noprefetch
 	PREF( Pref_Load, 0(KEY) )
 	PREF( Pref_Load, 32(KEY) )
 	// Prefetch first 256 bytes.
@@ -103,6 +105,7 @@ chacha20_mips:
 	PREF( Pref_Load,192(IN) )
 	PREF( Pref_Load,224(IN) )
 
+.Lchacha20_mips_noprefetch:
 
 	// Return if no bytes
 	.set noreorder
@@ -246,8 +249,14 @@ chacha20_mips:
 	nop
 
 .Lchacha20_mips_xor_64b:
+
+	slti	T6, BYTES, 256
+	bnez	T6, .Lchacha20_mips_noprefetch2
+
 	PREF( Pref_Load,192(IN) )
 	PREF( Pref_Load,224(IN) )
+
+.Lchacha20_mips_noprefetch2:
 
 	lw T0, 0(IN)
 	lw T1, 4(IN)
