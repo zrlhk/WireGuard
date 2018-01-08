@@ -93,6 +93,10 @@ poly1305_blocks_mips:
 	srl S1, R1, 2
 	srl S2, R2, 2
 	srl S3, R3, 2
+
+	// 'c' carry previous cycle = 0.
+	move CA, $zero
+
 	addu S1, R1
 	addu S2, R2
 	addu S3, R3
@@ -118,10 +122,11 @@ poly1305_blocks_mips:
 	rotr I3, 16
 #endif
 
-	// h0 = (u32)(d0 = (u64)h0 + le32_to_cpuvp(inp + 0));
+	// h0 = (u32)(d0 = (u64)h0 + le32_to_cpuvp(inp + 0) + c 'Carry_previous cycle');
 
 	multu H0, SC
 	maddu I0, SC
+	maddu CA, SC
 	mflo  O0
 	mfhi  CA
 
@@ -188,6 +193,9 @@ poly1305_blocks_mips:
 	mflo	H2
 	mfhi	CA
 
+	// D4
+	mul	H4, O4, R0
+
 	// D3
 
 	multu O0, R3
@@ -197,24 +205,27 @@ poly1305_blocks_mips:
 	maddu O4, S3
 	maddu CA, SC
 
-	mflo	H3
 	mfhi	CA
-
-	// H4
-	mul	H4, O4, R0
-	addu	H4, CA
-
-	// c = (h4 >> 2) + (h4 & ~3U);
-	srl	O0, H4, 2
-	move	CA, H4
-	ins	CA, $zero, 0, 2
-	addu	CA, O0
-
-	andi	H4, 3
+	mflo	H3
 
 	// check length
 	slti	SC, srclen, POLY1305_BLOCK_SIZE
 
+	// h4 += (u32)(d3 >> 32);
+	addu	O4, H4, CA
+
+	andi	H4, O4, 3
+	// c = (h4 >> 2) + (h4 & ~3U);
+	srl	CA, O4, 2
+	ins	O4, $zero, 0, 2
+
+	// able to do a 16 byte block.
+	.set noreorder
+	beqz SC, .Lpoly1305_loop
+	// Delay slot is always executed.
+	addu	CA, O4
+	.set reorder
+	
 	// CONSTANT_TIME_CARRY
 	addu	H0, CA
 	sltu	CA, H0, CA
@@ -225,10 +236,6 @@ poly1305_blocks_mips:
 	addu	H3, CA
 	sltu	CA, H3, CA
 	addu	H4, CA
-
-	// able to do a 16 byte block.
-	beqz SC, .Lpoly1305_loop
-	nop
 
 	// restore the used save registers.
 	lw  $s0, 0($sp)
