@@ -61,16 +61,18 @@
 .ent poly1305_blocks_mips
 poly1305_blocks_mips:
 	.frame  $sp,POLY1305_STACK_SIZE,$31
-	// store the used save registers.
-	addiu	$sp, -POLY1305_STACK_SIZE
 
 	// return if srclen < POLY1305_BLOCK_SIZE
 	slti	SC, srclen, POLY1305_BLOCK_SIZE
-	bnez	SC, .Lpoly1305_blocks_mips_end
-	nop
 
 	LOAD_ctx_r(0)
 	LOAD_ctx_r(1)
+
+	.set noreorder
+	bnez	SC, .Lpoly1305_blocks_mips_end
+	addiu	$sp, -POLY1305_STACK_SIZE
+	.set reorder
+
 	LOAD_ctx_r(2)
 	LOAD_ctx_r(3)
 
@@ -101,15 +103,13 @@ poly1305_blocks_mips:
 	addu S2, R2
 	addu S3, R3
 
+	addiu SC, $zero, 1
+
 .Lpoly1305_loop:
 	lw I0, 0(src)
 	lw I1, 4(src)
 	lw I2, 8(src)
 	lw I3,12(src)
-
-	addiu SC, $zero, 1
-	addiu src,     POLY1305_BLOCK_SIZE
-	addiu srclen, -POLY1305_BLOCK_SIZE
 
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 	wsbh I0
@@ -123,41 +123,45 @@ poly1305_blocks_mips:
 #endif
 
 	// h0 = (u32)(d0 = (u64)h0 + le32_to_cpuvp(inp + 0) + c 'Carry_previous cycle');
-
 	multu H0, SC
 	maddu I0, SC
 	maddu CA, SC
-	mflo  O0
+
+	addiu src,     POLY1305_BLOCK_SIZE
+
 	mfhi  CA
+	mflo  O0
 
 	// h1 = (u32)(d1 = (u64)h1 + (d0 >> 32) + le32_to_cpuvp(inp + 4));
 
 	multu H1, SC
 	maddu I1, SC
 	maddu CA, SC
-	mflo  O1
+
+	addiu srclen, -POLY1305_BLOCK_SIZE
+
 	mfhi  CA
+	mflo  O1
 
 	// h2 = (u32)(d2 = (u64)h2 + (d1 >> 32) + le32_to_cpuvp(inp + 8));
 
 	multu H2, SC
 	maddu I2, SC
 	maddu CA, SC
-	mflo  O2
 	mfhi  CA
+	mflo  O2
 
 	// h3 = (u32)(d3 = (u64)h3 + (d2 >> 32) + le32_to_cpuvp(inp + 12));
 
 	multu H3, SC
 	maddu I3, SC
 	maddu CA, SC
-	mflo  O3
-	mfhi  CA
 
 	// h4 += (u32)(d3 >> 32) + padbit;
-
 	addu O4, H4, hibit
-	addu O4, CA
+
+	mfhi  CA
+	mflo  O3
 
 	// D0
 
@@ -166,8 +170,10 @@ poly1305_blocks_mips:
 	maddu O2, S2
 	maddu O3, S1
 
-	mflo	H0
+	addu O4, CA
+
 	mfhi	CA
+	mflo	H0
 
 	// D1
 
@@ -177,9 +183,8 @@ poly1305_blocks_mips:
 	maddu O3, S2
 	maddu O4, S1
 	maddu CA, SC
-
-	mflo	H1
 	mfhi	CA
+	mflo	H1
 
 	// D2
 
@@ -189,11 +194,11 @@ poly1305_blocks_mips:
 	maddu O3, S3
 	maddu O4, S2
 	maddu CA, SC
-
-	mflo	H2
 	mfhi	CA
+	mflo	H2
 
 	// D4
+
 	mul	H4, O4, R0
 
 	// D3
@@ -205,11 +210,11 @@ poly1305_blocks_mips:
 	maddu O4, S3
 	maddu CA, SC
 
+	// check length
+	slti	O0, srclen, POLY1305_BLOCK_SIZE
+
 	mfhi	CA
 	mflo	H3
-
-	// check length
-	slti	SC, srclen, POLY1305_BLOCK_SIZE
 
 	// h4 += (u32)(d3 >> 32);
 	addu	O4, H4, CA
@@ -221,11 +226,11 @@ poly1305_blocks_mips:
 
 	// able to do a 16 byte block.
 	.set noreorder
-	beqz SC, .Lpoly1305_loop
+	beqz O0, .Lpoly1305_loop
 	// Delay slot is always executed.
 	addu	CA, O4
 	.set reorder
-	
+
 	// CONSTANT_TIME_CARRY
 	addu	H0, CA
 	sltu	CA, H0, CA
@@ -254,15 +259,11 @@ poly1305_blocks_mips:
 	STORE_ctx_h(4)
 
 .Lpoly1305_blocks_mips_end:
-	// return remaining bytes
-	move	$v0, srclen
-
-	.set noreorder
 	// Jump Back
+	.set noreorder
 	jr	$ra
 	addiu	$sp, POLY1305_STACK_SIZE
 	.set reorder
-
 .end poly1305_blocks_mips
 .set at
 .set reorder
@@ -364,7 +365,7 @@ poly1305_emit_mips:
 #define PR3 $t7
 #define PT0 $t0
 
-#define LOAD_key(RG,n)		lw RG, (n * 4) ## ($a1);
+#define LOAD_key(RG,n)		lw RG, (n * 4) ## ($a1)
 
 // asmlinkage void poly1305_init_mips(void *ctx, const u8 key[16]);
 .globl poly1305_init_mips
